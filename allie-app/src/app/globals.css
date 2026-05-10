@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  /* Brand */
+  --color-lavender-50:  #F3F0FF;
+  --color-lavender-100: #E9E4FF;
+  --color-lavender-200: #D4CAFF;
+  --color-lavender-500: #7C6AF7;
+  --color-lavender-600: #6652E8;
+  --color-lavender-700: #5040C8;
+
+  /* Neutral */
+  --color-ink:          #2D2D2D;
+  --color-ink-soft:     #6B7280;
+  --color-border:       #E5E7EB;
+  --color-surface:      #FFFFFF;
+  --color-bg:           #FAFAFA;
+}
+
+button, [role="button"] {
+  cursor: pointer;
+}

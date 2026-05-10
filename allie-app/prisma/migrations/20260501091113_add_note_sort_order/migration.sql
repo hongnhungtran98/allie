@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Note" ADD COLUMN     "sortOrder" INTEGER NOT NULL DEFAULT 0;

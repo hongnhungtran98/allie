@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name                String
+  email               String   @unique
+  passwordHash        String
+  role                Role     @default(USER)
+  notificationEnabled Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  bookmarks          Bookmark[]
+  notes              Note[]
+  timelineItems      TimelineItem[]
+  randomItems        RandomItem[]
+  notificationInbox  NotificationInbox[]
+  foodOrders         FoodOrder[]
+  foodSelections     FoodOrderSelection[]
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  url       String
+  isPinned  Boolean  @default(false)
+  sortOrder Int      @default(0)
+  icon      String?
+  color     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  content   String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String
+  updatedBy String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TimelineItem {
+  id                String    @id @default(cuid())
+  userId            String
+  title             String
+  date              DateTime  @db.Date
+  time              DateTime? @db.Time
+  isDone            Boolean   @default(false)
+  color             String?
+  hasReminder       Boolean   @default(false)
+  reminderMinutes   Int?
+  reminderTime      DateTime?
+  isReminded        Boolean   @default(false)
+  recurrenceGroupId String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         String
+  updatedBy         String
+
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationInbox NotificationInbox[]
+}
+
+model NotificationInbox {
+  id             String    @id @default(cuid())
+  userId         String
+  timelineItemId String?
+  title          String
+  itemDate       String
+  firedAt        DateTime  @default(now())
+  isRead         Boolean   @default(false)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timelineItem TimelineItem? @relation(fields: [timelineItemId], references: [id], onDelete: SetNull)
+}
+
+model RandomItem {
+  id        String   @id @default(cuid())
+  userId    String?
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String
+  updatedBy String
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FoodOrder {
+  id             String    @id @default(cuid())
+  creatorId      String
+  sourceUrl      String
+  restaurantName String    @default("")
+  status         String    @default("open")
+  countdownEnd   DateTime?
+  paymentMode    String    @default("orderer_pays")
+  shippingFee    Int       @default(0)
+  discount       Int       @default(0)
+  shareToken     String    @unique
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  creator    User                 @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  menuItems  FoodMenuItem[]
+  selections FoodOrderSelection[]
+}
+
+model FoodMenuItem {
+  id              String   @id @default(cuid())
+  orderId         String
+  name            String
+  imageUrl        String?
+  originalPrice   Int
+  discountedPrice Int?
+  options         Json     @default("[]")
+  isAvailable     Boolean  @default(true)
+
+  order      FoodOrder            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  selections FoodOrderSelection[]
+}
+
+model FoodOrderSelection {
+  id              String   @id @default(cuid())
+  orderId         String
+  userId          String
+  menuItemId      String
+  quantity        Int      @default(1)
+  selectedOptions Json     @default("[]")
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  order    FoodOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  menuItem FoodMenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+}
