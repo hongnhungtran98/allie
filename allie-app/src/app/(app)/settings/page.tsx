@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, BellOff, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Bell, BellOff, CheckCircle, XCircle, AlertCircle, KeyRound } from "lucide-react";
 
 type PermissionState = "default" | "granted" | "denied" | "unsupported";
 
@@ -16,6 +16,42 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [requesting, setRequesting] = useState(false);
+
+  // Đổi mật khẩu
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMessage, setPwMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  const changePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwMessage(null);
+    if (newPassword.length < 6) {
+      setPwMessage({ type: "err", text: "Mật khẩu mới phải có ít nhất 6 ký tự" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwMessage({ type: "err", text: "Xác nhận mật khẩu không khớp" });
+      return;
+    }
+    setPwSaving(true);
+    const res = await fetch("/api/settings/password", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    setPwSaving(false);
+    if (res.ok) {
+      setPwMessage({ type: "ok", text: "Đổi mật khẩu thành công" });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setPwMessage({ type: "err", text: data.error ?? "Đổi mật khẩu thất bại" });
+    }
+  };
 
   useEffect(() => {
     setPermission(getPermissionState());
@@ -140,6 +176,67 @@ export default function SettingsPage() {
             Notifications only fire while this page is open in the browser. Background (push) notifications are not supported in this version.
           </p>
         </div>
+      </div>
+
+      {/* Change password */}
+      <div className="bg-surface rounded-2xl border border-border divide-y divide-border">
+        <div className="px-6 py-4 flex items-center gap-3">
+          <KeyRound size={18} className="text-lavender-500 shrink-0" />
+          <h2 className="font-semibold text-ink">Đổi mật khẩu</h2>
+        </div>
+
+        <form onSubmit={changePassword} className="px-6 py-5 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-ink-soft uppercase tracking-wide">Mật khẩu hiện tại</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              className="w-full px-3 py-2 rounded-xl border border-border bg-surface text-sm text-ink focus:outline-none focus:border-lavender-500"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-ink-soft uppercase tracking-wide">Mật khẩu mới</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              minLength={6}
+              autoComplete="new-password"
+              className="w-full px-3 py-2 rounded-xl border border-border bg-surface text-sm text-ink focus:outline-none focus:border-lavender-500"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-ink-soft uppercase tracking-wide">Xác nhận mật khẩu mới</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={6}
+              autoComplete="new-password"
+              className="w-full px-3 py-2 rounded-xl border border-border bg-surface text-sm text-ink focus:outline-none focus:border-lavender-500"
+            />
+          </div>
+
+          {pwMessage && (
+            <div className={`flex items-center gap-2 text-sm ${pwMessage.type === "ok" ? "text-green-600" : "text-red-500"}`}>
+              {pwMessage.type === "ok" ? <CheckCircle size={16} /> : <XCircle size={16} />}
+              <span>{pwMessage.text}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={pwSaving}
+            className="px-4 py-2 rounded-xl bg-lavender-500 hover:bg-lavender-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors cursor-pointer"
+          >
+            {pwSaving ? "Đang lưu…" : "Đổi mật khẩu"}
+          </button>
+        </form>
       </div>
     </div>
   );

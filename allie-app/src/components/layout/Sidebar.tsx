@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { logoutAction } from "@/app/(auth)/login/actions";
+import { LogOut } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard",      label: "Home",          icon: "🏠" },
@@ -91,6 +93,16 @@ export default function Sidebar({ userName, userRole }: SidebarProps) {
             <p className="text-sm font-medium text-ink truncate">{userName}</p>
             <p className="text-xs text-ink-soft truncate capitalize">{userRole.toLowerCase()}</p>
           </div>
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              title="Đăng xuất"
+              aria-label="Đăng xuất"
+              className="p-1.5 rounded-lg text-ink-soft hover:bg-lavender-100 hover:text-lavender-600 transition-colors"
+            >
+              <LogOut size={18} strokeWidth={2} />
+            </button>
+          </form>
         </div>
       </div>
     </aside>
