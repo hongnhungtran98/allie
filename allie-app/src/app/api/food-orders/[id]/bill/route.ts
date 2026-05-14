@@ -30,10 +30,13 @@ export async function GET(_req: Request, { params }: Params) {
   const byUser: Record<string, { userName: string; items: { name: string; price: number; quantity: number }[]; subtotal: number }> = {};
   for (const sel of order.selections) {
     const uid = sel.userId;
-    const price = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
+    const basePrice = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
+    const options = (sel.selectedOptions as { price: number }[] | null) ?? [];
+    const addOns = options.reduce((a, o) => a + (o.price ?? 0), 0);
+    const unitPrice = basePrice + addOns;
     if (!byUser[uid]) byUser[uid] = { userName: sel.user.name, items: [], subtotal: 0 };
-    byUser[uid].items.push({ name: sel.menuItem.name, price, quantity: sel.quantity });
-    byUser[uid].subtotal += price * sel.quantity;
+    byUser[uid].items.push({ name: sel.menuItem.name, price: unitPrice, quantity: sel.quantity });
+    byUser[uid].subtotal += unitPrice * sel.quantity;
   }
 
   const participants = Object.values(byUser);
@@ -69,11 +72,12 @@ export async function GET(_req: Request, { params }: Params) {
     }
   }
 
-  // Local split calculation: proportional by subtotal
+  // Local split calculation (formula từ docs/formular/Tính tiền Bill.xlsx):
+  //   amount = ROUND( subtotal_person * grandTotal / subtotal_total , -3 )  // làm tròn 1.000₫
   const totalItems = participants.reduce((s, p) => s + p.subtotal, 0) || 1;
   const splitResult = participants.map((p) => ({
     name: p.userName,
-    amount: Math.round(p.subtotal + (p.subtotal / totalItems) * (order.shippingFee - order.discount)),
+    amount: Math.round((p.subtotal * grandTotal) / totalItems / 1000) * 1000,
   }));
 
   return NextResponse.json({ paymentMode: "split", participants, grandTotal, shippingFee: order.shippingFee, discount: order.discount, splitResult });

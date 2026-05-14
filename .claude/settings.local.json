@@ -6,7 +6,8 @@
       "PowerShell(Stop-Process -Force)",
       "Bash(Get-ChildItem -Path \"c:\\\\Nhung\\\\Allie\" -Force)",
       "Bash(Select-Object Name, PSIsContainer)",
-      "Bash(Format-Table -AutoSize)"
+      "Bash(Format-Table -AutoSize)",
+      "Bash(npx prisma *)"
     ]
   }
 }

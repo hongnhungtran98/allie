@@ -15,10 +15,25 @@ export default function NewFoodOrderForm() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  function isGrabFoodUrl(url: string) {
+    try {
+      const u = new URL(url);
+      return (
+        /(^|\.)food\.grab\.com$/i.test(u.hostname) ||
+        /^r\.grab\.com$/i.test(u.hostname)
+      );
+    } catch {
+      return false;
+    }
+  }
+
   function validate() {
     const e: Record<string, string> = {};
-    if (!sourceUrl.trim()) e.sourceUrl = "Source URL is required";
-    else if (!sourceUrl.startsWith("http")) e.sourceUrl = "Enter a valid URL";
+    const trimmed = sourceUrl.trim();
+    if (!trimmed) e.sourceUrl = "Source URL is required";
+    else if (!trimmed.startsWith("http")) e.sourceUrl = "Enter a valid URL";
+    else if (!isGrabFoodUrl(trimmed))
+      e.sourceUrl = "Hiện tại chỉ hỗ trợ link từ GrabFood (food.grab.com hoặc r.grab.com). ShopeeFood và các nguồn khác chưa được hỗ trợ.";
     if (countdownMinutes && parseInt(countdownMinutes) <= 0)
       e.countdownMinutes = "Countdown must be a positive number";
     return e;
@@ -82,10 +97,17 @@ export default function NewFoodOrderForm() {
           value={sourceUrl}
           onChange={(e) => setSourceUrl(e.target.value)}
           onBlur={() => {
-            if (!sourceUrl.trim()) setErrors((p) => ({ ...p, sourceUrl: "Source URL is required" }));
+            const trimmed = sourceUrl.trim();
+            if (!trimmed) setErrors((p) => ({ ...p, sourceUrl: "Source URL is required" }));
+            else if (!isGrabFoodUrl(trimmed))
+              setErrors((p) => ({
+                ...p,
+                sourceUrl:
+                  "Hiện tại chỉ hỗ trợ link từ GrabFood (food.grab.com hoặc r.grab.com). ShopeeFood và các nguồn khác chưa được hỗ trợ.",
+              }));
             else setErrors((p) => { const n = { ...p }; delete n.sourceUrl; return n; });
           }}
-          placeholder="https://shopeefood.vn/... or https://food.grab.com/..."
+          placeholder="https://food.grab.com/..."
           className={`w-full px-3 py-2 text-sm border rounded-xl bg-bg focus:outline-none focus:ring-2 focus:ring-lavender-500 ${
             errors.sourceUrl ? "border-red-400" : "border-border"
           }`}

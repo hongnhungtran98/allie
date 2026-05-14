@@ -2,13 +2,15 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import FoodOrderStatusBadge from "./FoodOrderStatusBadge";
+import DeleteOrderButton from "./DeleteOrderButton";
 
 export default async function FoodOrderPage() {
   const session = await auth();
   const userId = session!.user.id;
+  const isAdmin = session!.user.role === "ADMIN";
 
   const orders = await prisma.foodOrder.findMany({
-    where: { creatorId: userId },
+    where: isAdmin ? undefined : { creatorId: userId },
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { selections: true } },
@@ -21,8 +23,10 @@ export default async function FoodOrderPage() {
   // Calculate total per order
   const ordersWithTotal = orders.map((o) => {
     const itemTotal = o.selections.reduce((sum, s) => {
-      const price = s.menuItem.discountedPrice ?? s.menuItem.originalPrice;
-      return sum + price * s.quantity;
+      const basePrice = s.menuItem.discountedPrice ?? s.menuItem.originalPrice;
+      const options = (s.selectedOptions as { price: number }[] | null) ?? [];
+      const addOns = options.reduce((a, opt) => a + (opt.price ?? 0), 0);
+      return sum + (basePrice + addOns) * s.quantity;
     }, 0);
     const grandTotal = itemTotal + o.shippingFee - o.discount;
     return { ...o, grandTotal };
@@ -82,13 +86,14 @@ export default async function FoodOrderPage() {
                   <td className="px-4 py-3 text-right font-medium text-ink">
                     {o.grandTotal > 0 ? o.grandTotal.toLocaleString("vi-VN") + "₫" : "—"}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
                     <Link
                       href={`/food-order/${o.id}`}
                       className="text-lavender-600 hover:underline text-xs font-medium"
                     >
                       View →
                     </Link>
+                    {isAdmin && <DeleteOrderButton orderId={o.id} />}
                   </td>
                 </tr>
               ))}

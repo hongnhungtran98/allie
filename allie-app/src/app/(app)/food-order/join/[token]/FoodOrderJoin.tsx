@@ -50,14 +50,15 @@ function Countdown({ end }: { end: string }) {
     return { m: Math.floor(diff / 60), s: diff % 60, done: diff === 0 };
   }, [end]);
 
-  const [time, setTime] = useState(calc);
+  const [time, setTime] = useState<{ m: number; s: number; done: boolean } | null>(null);
 
   useEffect(() => {
-    if (time.done) return;
+    setTime(calc());
     const id = setInterval(() => setTime(calc()), 1000);
     return () => clearInterval(id);
-  }, [calc, time.done]);
+  }, [calc]);
 
+  if (!time) return <span className="font-mono text-amber-600 font-medium">--:--</span>;
   if (time.done) return <span className="text-red-500 font-medium">Time&apos;s up!</span>;
   return (
     <span className="font-mono text-amber-600 font-medium">
@@ -110,13 +111,22 @@ function OptionSelector({
   );
 }
 
+interface MyBill {
+  mySubtotal: number;
+  myAmount: number;
+  itemsSubtotal: number;
+  grandTotal: number;
+}
+
 export default function FoodOrderJoin({
   order,
   shareToken,
+  myBill,
 }: {
   order: Order;
   currentUserId: string;
   shareToken: string;
+  myBill: MyBill | null;
 }) {
   const toast = useToast();
 
@@ -234,6 +244,15 @@ export default function FoodOrderJoin({
       {!isOpen && (
         <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-sm text-gray-600">
           This order session is closed. You can no longer make selections.
+        </div>
+      )}
+
+      {!isOpen && myBill && (
+        <div className="bg-lavender-50 border border-lavender-200 rounded-2xl p-5">
+          <p className="text-sm font-medium text-ink-soft">You need to pay</p>
+          <p className="text-3xl font-bold text-lavender-700 mt-1">
+            {myBill.myAmount.toLocaleString("vi-VN")}₫
+          </p>
         </div>
       )}
 

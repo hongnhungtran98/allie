@@ -30,6 +30,31 @@ export default async function FoodOrderJoinPage({ params }: Props) {
     order.status = "closed";
   }
 
+  // When closed, compute how much this member owes (matches docs/formular/Tính tiền Bill.xlsx).
+  let myBill: { mySubtotal: number; myAmount: number; itemsSubtotal: number; grandTotal: number } | null = null;
+  if (order.status === "closed") {
+    const allSelections = await prisma.foodOrderSelection.findMany({
+      where: { orderId: order.id },
+      include: { menuItem: true },
+    });
+    const lineTotal = (s: (typeof allSelections)[number]) => {
+      const base = s.menuItem.discountedPrice ?? s.menuItem.originalPrice;
+      const opts = (s.selectedOptions as { price: number }[] | null) ?? [];
+      const addOns = opts.reduce((a, o) => a + (o.price ?? 0), 0);
+      return (base + addOns) * s.quantity;
+    };
+    const itemsSubtotal = allSelections.reduce((sum, s) => sum + lineTotal(s), 0);
+    const mySubtotal = allSelections
+      .filter((s) => s.userId === userId)
+      .reduce((sum, s) => sum + lineTotal(s), 0);
+    const grandTotal = itemsSubtotal + order.shippingFee - order.discount;
+    const myAmount =
+      order.paymentMode === "split" && itemsSubtotal > 0
+        ? Math.round((mySubtotal * grandTotal) / itemsSubtotal / 1000) * 1000
+        : mySubtotal;
+    myBill = { mySubtotal, myAmount, itemsSubtotal, grandTotal };
+  }
+
   // If creator visits join link, redirect them to detail page
   // (We'll keep them on join page too — it's fine)
 
@@ -54,5 +79,5 @@ export default async function FoodOrderJoinPage({ params }: Props) {
     })),
   };
 
-  return <FoodOrderJoin order={serialized} currentUserId={userId} shareToken={token} />;
+  return <FoodOrderJoin order={serialized} currentUserId={userId} shareToken={token} myBill={myBill} />;
 }

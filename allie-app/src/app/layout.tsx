@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import BugReporter from "@/components/BugReporter";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -22,6 +23,7 @@ export default function RootLayout({
     <html lang="en" className={`${plusJakarta.variable} h-full`}>
       <body className="min-h-full bg-[#FAFAFA] font-sans antialiased">
         {children}
+        <BugReporter />
       </body>
     </html>
   );

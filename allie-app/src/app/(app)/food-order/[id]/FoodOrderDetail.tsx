@@ -38,6 +38,7 @@ interface Order {
   shippingFee: number;
   discount: number;
   shareToken: string;
+  extensionCount: number;
   createdAt: string;
   creator: { id: string; name: string };
   menuItems: MenuItem[];
@@ -91,10 +92,79 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
   const [bill, setBill] = useState<BillResult | null>(null);
   const [loadingBill, setLoadingBill] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [menuExpanded, setMenuExpanded] = useState(false);
+  const [countdownEnd, setCountdownEnd] = useState(order.countdownEnd);
+  const [extensionCount, setExtensionCount] = useState(order.extensionCount ?? 0);
+  const [extending, setExtending] = useState(false);
+  const [shippingFee, setShippingFee] = useState(order.shippingFee);
+  const [discount, setDiscount] = useState(order.discount);
+  const [editingFee, setEditingFee] = useState<"shipping" | "discount" | null>(null);
+  const [feeDraft, setFeeDraft] = useState("");
+  const [savingFee, setSavingFee] = useState(false);
+
+  const canEditFees = status === "open" && order.creator.id === currentUserId;
+
+  function startEdit(kind: "shipping" | "discount") {
+    setEditingFee(kind);
+    setFeeDraft(String(kind === "shipping" ? shippingFee : discount));
+  }
+
+  async function saveFee() {
+    if (!editingFee) return;
+    const value = Number(feeDraft);
+    if (!Number.isFinite(value) || value < 0) {
+      toast("error", "Enter a non-negative number");
+      return;
+    }
+    setSavingFee(true);
+    try {
+      const body = editingFee === "shipping" ? { shippingFee: value } : { discount: value };
+      const res = await fetch(`/api/food-orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        if (editingFee === "shipping") setShippingFee(Math.round(value));
+        else setDiscount(Math.round(value));
+        setEditingFee(null);
+        toast("success", "Updated");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast("error", err.error ?? "Failed to update");
+      }
+    } finally {
+      setSavingFee(false);
+    }
+  }
 
   const shareUrl = typeof window !== "undefined"
     ? `${window.location.origin}/food-order/join/${order.shareToken}`
     : `/food-order/join/${order.shareToken}`;
+
+  const MAX_EXTENSIONS = 3;
+
+  async function handleExtend() {
+    setExtending(true);
+    try {
+      const res = await fetch(`/api/food-orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "extend" }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setCountdownEnd(updated.countdownEnd);
+        setExtensionCount(updated.extensionCount);
+        toast("success", "Đã gia hạn thêm 10 phút");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast("error", err.error ?? "Không thể gia hạn");
+      }
+    } finally {
+      setExtending(false);
+    }
+  }
 
   async function handleClose() {
     setClosing(true);
@@ -145,6 +215,26 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
     byUser[sel.userId].items.push(sel);
   }
 
+  // Live bill calculation (mirrors docs/formular/Tính tiền Bill.xlsx).
+  // Per-person item subtotal includes base price + selectedOptions add-ons.
+  const userSubtotals = Object.entries(byUser).map(([uid, { userName, items }]) => {
+    const subtotal = items.reduce((sum, sel) => {
+      const base = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
+      const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
+      return sum + (base + addOns) * sel.quantity;
+    }, 0);
+    return { uid, userName, subtotal };
+  });
+  const itemsSubtotal = userSubtotals.reduce((s, p) => s + p.subtotal, 0);
+  const grandTotal = itemsSubtotal + shippingFee - discount;
+  // Excel: ROUND( subtotal_person * grandTotal / itemsSubtotal , -3 )
+  const splitPerPerson = userSubtotals.map((p) => ({
+    ...p,
+    amount: itemsSubtotal > 0
+      ? Math.round((p.subtotal * grandTotal) / itemsSubtotal / 1000) * 1000
+      : 0,
+  }));
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
@@ -158,9 +248,14 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
           </h1>
           <div className="flex items-center gap-3 mt-1.5 flex-wrap">
             <FoodOrderStatusBadge status={status} />
-            {status === "open" && order.countdownEnd && (
+            {status === "open" && countdownEnd && (
               <span className="text-sm text-ink-soft">
-                Closes in <Countdown end={order.countdownEnd} />
+                Closes in <Countdown end={countdownEnd} />
+                {extensionCount > 0 && (
+                  <span className="ml-1 text-xs">
+                    (đã gia hạn {extensionCount}/{MAX_EXTENSIONS})
+                  </span>
+                )}
               </span>
             )}
             <a
@@ -174,6 +269,18 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
+          {status === "open" && order.creator.id === currentUserId && (
+            <button
+              onClick={handleExtend}
+              disabled={extending || extensionCount >= MAX_EXTENSIONS}
+              title={extensionCount >= MAX_EXTENSIONS ? "Đã đạt giới hạn 3 lần" : "Thêm 10 phút"}
+              className="px-3 py-1.5 text-sm font-medium text-lavender-600 border border-lavender-200 hover:bg-lavender-50 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {extending
+                ? "..."
+                : `+10 phút (${extensionCount}/${MAX_EXTENSIONS})`}
+            </button>
+          )}
           {status === "open" && (
             <button
               onClick={() => setShowClose(true)}
@@ -207,26 +314,102 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
 
       {/* Order details row */}
       <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: "Payment", value: order.paymentMode === "orderer_pays" ? "Orderer pays" : "Split bill" },
-          { label: "Shipping", value: order.shippingFee > 0 ? order.shippingFee.toLocaleString("vi-VN") + "₫" : "Free" },
-          { label: "Discount", value: order.discount > 0 ? "-" + order.discount.toLocaleString("vi-VN") + "₫" : "None" },
-        ].map((item) => (
-          <div key={item.label} className="bg-surface border border-border rounded-xl p-3">
-            <p className="text-xs text-ink-soft mb-1">{item.label}</p>
-            <p className="text-sm font-medium text-ink">{item.value}</p>
-          </div>
-        ))}
+        <div className="bg-surface border border-border rounded-xl p-3">
+          <p className="text-xs text-ink-soft mb-1">Payment</p>
+          <p className="text-sm font-medium text-ink">
+            {order.paymentMode === "orderer_pays" ? "Orderer pays" : "Split bill"}
+          </p>
+        </div>
+
+        {(["shipping", "discount"] as const).map((kind) => {
+          const value = kind === "shipping" ? shippingFee : discount;
+          const label = kind === "shipping" ? "Shipping" : "Discount";
+          const isEditing = editingFee === kind;
+          const display =
+            kind === "shipping"
+              ? value > 0 ? value.toLocaleString("vi-VN") + "₫" : "Free"
+              : value > 0 ? "-" + value.toLocaleString("vi-VN") + "₫" : "None";
+          return (
+            <div key={kind} className="bg-surface border border-border rounded-xl p-3">
+              <p className="text-xs text-ink-soft mb-1">{label}</p>
+              {isEditing ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={0}
+                    autoFocus
+                    value={feeDraft}
+                    onChange={(e) => setFeeDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveFee();
+                      else if (e.key === "Escape") setEditingFee(null);
+                    }}
+                    disabled={savingFee}
+                    className="w-full min-w-0 px-2 py-1 text-sm border border-border rounded-lg bg-bg text-ink focus:outline-none focus:border-lavender-400"
+                  />
+                  <button
+                    onClick={saveFee}
+                    disabled={savingFee}
+                    className="px-2 py-1 text-xs font-medium text-white bg-lavender-500 hover:bg-lavender-600 rounded-lg disabled:opacity-50"
+                  >
+                    {savingFee ? "..." : "Save"}
+                  </button>
+                  <button
+                    onClick={() => setEditingFee(null)}
+                    disabled={savingFee}
+                    className="px-2 py-1 text-xs text-ink-soft hover:text-ink"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-ink">{display}</p>
+                  {canEditFees && (
+                    <button
+                      onClick={() => startEdit(kind)}
+                      className="text-xs text-lavender-600 hover:underline shrink-0"
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Left column: Menu + Selections */}
+        <div className="space-y-6">
         {/* Menu */}
         <div>
-          <h2 className="text-base font-semibold text-ink mb-3">Menu ({order.menuItems.length} items)</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-ink">
+              Menu ({order.menuItems.length} items)
+            </h2>
+            {order.menuItems.length > 0 && (
+              <button
+                onClick={() => setMenuExpanded((v) => !v)}
+                className="text-xs font-medium text-lavender-600 hover:underline"
+                aria-expanded={menuExpanded}
+              >
+                {menuExpanded ? "Collapse ▲" : "Expand ▼"}
+              </button>
+            )}
+          </div>
           {order.menuItems.length === 0 ? (
             <div className="bg-surface border border-border rounded-2xl p-8 text-center text-ink-soft text-sm">
               Menu is being fetched...
             </div>
+          ) : !menuExpanded ? (
+            <button
+              onClick={() => setMenuExpanded(true)}
+              className="w-full bg-surface border border-border rounded-2xl p-4 text-center text-ink-soft text-sm hover:bg-bg transition-colors"
+            >
+              Menu collapsed — click to view {order.menuItems.length} item{order.menuItems.length === 1 ? "" : "s"}
+            </button>
           ) : (
             <div className="space-y-2">
               {order.menuItems.map((item) => (
@@ -277,15 +460,24 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
                   <p className="text-sm font-semibold text-ink mb-2">{userName}</p>
                   <div className="space-y-1">
                     {items.map((sel) => {
-                      const price = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
+                      const basePrice = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
+                      const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
+                      const lineTotal = (basePrice + addOns) * sel.quantity;
                       return (
-                        <div key={sel.id} className="flex items-center justify-between text-sm">
-                          <span className="text-ink flex-1 min-w-0 truncate">
-                            {sel.menuItem.name}
-                            {sel.quantity > 1 && <span className="text-ink-soft"> ×{sel.quantity}</span>}
-                          </span>
-                          <span className="text-ink-soft ml-2 shrink-0">
-                            {(price * sel.quantity).toLocaleString("vi-VN")}₫
+                        <div key={sel.id} className="flex items-start justify-between text-sm gap-2">
+                          <div className="flex-1 min-w-0">
+                            <span className="text-ink truncate block">
+                              {sel.menuItem.name}
+                              {sel.quantity > 1 && <span className="text-ink-soft"> ×{sel.quantity}</span>}
+                            </span>
+                            {sel.selectedOptions.length > 0 && (
+                              <span className="text-xs text-ink-soft block truncate">
+                                + {sel.selectedOptions.map((o) => o.choice).join(", ")}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-ink-soft shrink-0">
+                            {lineTotal.toLocaleString("vi-VN")}₫
                           </span>
                         </div>
                       );
@@ -296,7 +488,77 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
             </div>
           )}
         </div>
-      </div>
+        </div>
+
+        {/* Right column: Bill Calculation + Bill Summary */}
+        <div className="space-y-6">
+      {/* Live Bill Calculation (visible khi có ít nhất 1 selection) */}
+      {userSubtotals.length > 0 && (
+        <div className="bg-surface border border-border rounded-2xl p-5">
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-base font-semibold text-ink">
+              Bill Calculation
+              <span className="ml-2 text-xs font-normal text-ink-soft">
+                ({order.paymentMode === "orderer_pays" ? "Orderer pays" : "Split bill"})
+              </span>
+            </h2>
+            {status === "open" && (
+              <span className="text-xs text-ink-soft">Live preview</span>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            {order.paymentMode === "orderer_pays" ? (
+              userSubtotals.map((p) => (
+                <div key={p.uid} className="flex justify-between text-sm">
+                  <span className="text-ink">{p.userName}</span>
+                  <span className="text-ink-soft">{p.subtotal.toLocaleString("vi-VN")}₫</span>
+                </div>
+              ))
+            ) : (
+              splitPerPerson.map((p) => (
+                <div key={p.uid} className="flex justify-between text-sm">
+                  <span className="text-ink font-medium">{p.userName}</span>
+                  <span className="text-ink font-semibold">
+                    {p.amount.toLocaleString("vi-VN")}₫
+                    <span className="ml-2 text-xs font-normal text-ink-soft">
+                      (món: {p.subtotal.toLocaleString("vi-VN")}₫)
+                    </span>
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-border space-y-1">
+            <div className="flex justify-between text-sm text-ink-soft">
+              <span>Subtotal</span>
+              <span>{itemsSubtotal.toLocaleString("vi-VN")}₫</span>
+            </div>
+            {shippingFee > 0 && (
+              <div className="flex justify-between text-sm text-ink-soft">
+                <span>Shipping</span>
+                <span>+{shippingFee.toLocaleString("vi-VN")}₫</span>
+              </div>
+            )}
+            {discount > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Discount</span>
+                <span>-{discount.toLocaleString("vi-VN")}₫</span>
+              </div>
+            )}
+            <div className="flex justify-between text-base font-bold text-ink pt-1">
+              <span>Grand total</span>
+              <span>{grandTotal.toLocaleString("vi-VN")}₫</span>
+            </div>
+            {order.paymentMode === "split" && (
+              <p className="text-xs text-ink-soft pt-1">
+                Mỗi người = làm tròn 1.000₫ của (tiền món × tổng bill / tổng tiền món).
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Bill summary */}
       {status === "closed" && (
@@ -361,6 +623,8 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
           )}
         </div>
       )}
+        </div>
+      </div>
 
       <ConfirmDialog
         open={showClose}
