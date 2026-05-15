@@ -100,6 +100,7 @@ async function fetchGrabMenu(
 ): Promise<{ restaurantName: string; items: RawItem[] }> {
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -352,6 +353,7 @@ async function fetchShopeeFoodMenu(
 
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",

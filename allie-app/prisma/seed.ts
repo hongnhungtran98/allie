@@ -27,6 +27,10 @@ async function main() {
     { name: "Bùi Minh Dũng",            email: "dung.buiminh@allianceitsc.com",             password: "password@123", role: Role.USER },
     { name: "Trương Lê Khánh",          email: "khanhtl@allianceitsc.com",                  password: "password@123", role: Role.USER },
     { name: "Cao Khắc Bảo",             email: "bao.caokhac@allianceitsc.com",              password: "password@123", role: Role.USER },
+    { name: "Lê Vi",                    email: "vilee@allianceitsc.com",                    password: "password@123", role: Role.USER },
+    { name: "Vũ Thu Trang",             email: "tvu@allianceitsc.com",                      password: "password@123", role: Role.USER },
+    { name: "Trương Mạn Ngọc",          email: "ngoc.truongman@allianceitsc.com",           password: "password@123", role: Role.USER },
+    { name: "Trang Phan Thế Hào",       email: "hao.trangphanthe@allianceitsc.com",         password: "password@123", role: Role.USER },
   ];
 
   for (const u of users) {
