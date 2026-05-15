@@ -17,7 +17,7 @@ export default async function FoodOrderDetailPage({ params }: Props) {
       menuItems: { where: { isAvailable: true }, orderBy: { name: "asc" } },
       selections: {
         include: {
-          user: { select: { id: true, name: true } },
+          user: { select: { id: true, name: true, email: true } },
           menuItem: true,
         },
         orderBy: { createdAt: "asc" },

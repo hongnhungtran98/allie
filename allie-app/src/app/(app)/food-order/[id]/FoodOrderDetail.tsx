@@ -25,7 +25,8 @@ interface SelectionItem {
   quantity: number;
   selectedOptions: { group: string; choice: string; price: number }[];
   note: string | null;
-  user: { id: string; name: string };
+  ordered: boolean;
+  user: { id: string; name: string; email: string };
   menuItem: MenuItem;
 }
 interface Order {
@@ -92,6 +93,39 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
   const [bill, setBill] = useState<BillResult | null>(null);
   const [loadingBill, setLoadingBill] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [exported, setExported] = useState(false);
+  const [orderedMap, setOrderedMap] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(order.selections.map((s) => [s.id, s.ordered ?? false])),
+  );
+  const [pendingOrdered, setPendingOrdered] = useState<Record<string, boolean>>({});
+
+  const isOrderer = order.creator.id === currentUserId;
+
+  async function toggleOrdered(selectionId: string) {
+    const next = !orderedMap[selectionId];
+    setOrderedMap((m) => ({ ...m, [selectionId]: next }));
+    setPendingOrdered((p) => ({ ...p, [selectionId]: true }));
+    try {
+      const res = await fetch(`/api/food-orders/${order.id}/selections/${selectionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ordered: next }),
+      });
+      if (!res.ok) {
+        setOrderedMap((m) => ({ ...m, [selectionId]: !next }));
+        toast("error", "Không cập nhật được trạng thái");
+      }
+    } catch {
+      setOrderedMap((m) => ({ ...m, [selectionId]: !next }));
+      toast("error", "Không cập nhật được trạng thái");
+    } finally {
+      setPendingOrdered((p) => {
+        const rest = { ...p };
+        delete rest[selectionId];
+        return rest;
+      });
+    }
+  }
   const [menuExpanded, setMenuExpanded] = useState(false);
   const [countdownEnd, setCountdownEnd] = useState(order.countdownEnd);
   const [extensionCount, setExtensionCount] = useState(order.extensionCount ?? 0);
@@ -200,6 +234,34 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
   useEffect(() => {
     if (status === "closed") loadBill();
   }, [status, loadBill]);
+
+  function exportBillData() {
+    const items: [string, number, string][] = [];
+    for (const sel of order.selections) {
+      const base = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
+      const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
+      const unitPrice = base + addOns;
+      for (let i = 0; i < sel.quantity; i++) {
+        items.push([sel.user.email, unitPrice, sel.menuItem.name]);
+      }
+    }
+    const data = {
+      bill_name: order.restaurantName,
+      bill_link: order.sourceUrl,
+      bill_ship: shippingFee,
+      bill_discount: discount,
+      items,
+    };
+    const json = JSON.stringify(data);
+    navigator.clipboard.writeText(json).then(
+      () => {
+        setExported(true);
+        toast("success", "Bill data copied to clipboard");
+        setTimeout(() => setExported(false), 2000);
+      },
+      () => toast("error", "Failed to copy"),
+    );
+  }
 
   function copyShareLink() {
     navigator.clipboard.writeText(shareUrl).then(() => {
@@ -463,9 +525,10 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
                       const basePrice = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
                       const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
                       const lineTotal = (basePrice + addOns) * sel.quantity;
+                      const isOrdered = orderedMap[sel.id] ?? false;
                       return (
                         <div key={sel.id} className="flex items-start justify-between text-sm gap-2">
-                          <div className="flex-1 min-w-0">
+                          <div className={`flex-1 min-w-0 ${isOrdered ? "line-through opacity-60" : ""}`}>
                             <span className="text-ink truncate block">
                               {sel.menuItem.name}
                               {sel.quantity > 1 && <span className="text-ink-soft"> ×{sel.quantity}</span>}
@@ -476,9 +539,19 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
                               </span>
                             )}
                           </div>
-                          <span className="text-ink-soft shrink-0">
+                          <span className={`text-ink-soft shrink-0 ${isOrdered ? "line-through opacity-60" : ""}`}>
                             {lineTotal.toLocaleString("vi-VN")}₫
                           </span>
+                          {isOrderer && (
+                            <input
+                              type="checkbox"
+                              checked={isOrdered}
+                              disabled={pendingOrdered[sel.id]}
+                              onChange={() => toggleOrdered(sel.id)}
+                              title={isOrdered ? "Đã đặt — bỏ đánh dấu" : "Đánh dấu đã đặt trên app"}
+                              className="mt-0.5 h-4 w-4 shrink-0 accent-lavender-500 cursor-pointer disabled:opacity-50"
+                            />
+                          )}
                         </div>
                       );
                     })}
@@ -563,7 +636,15 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
       {/* Bill summary */}
       {status === "closed" && (
         <div className="bg-surface border border-border rounded-2xl p-5">
-          <h2 className="text-base font-semibold text-ink mb-4">Bill Summary</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-ink">Bill Summary</h2>
+            <button
+              onClick={exportBillData}
+              className="px-3 py-1.5 text-xs font-medium text-lavender-600 border border-lavender-200 hover:bg-lavender-50 rounded-xl transition-colors"
+            >
+              {exported ? "Copied!" : "Export bill data"}
+            </button>
+          </div>
           {loadingBill ? (
             <p className="text-sm text-ink-soft">Calculating...</p>
           ) : bill ? (
