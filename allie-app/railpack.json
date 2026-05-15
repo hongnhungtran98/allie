@@ -5,9 +5,11 @@
     "node": "22.12.0",
     "pnpm": "10"
   },
+  "variables": {
+    "PUPPETEER_CACHE_DIR": "/app/.cache/puppeteer"
+  },
   "deploy": {
     "aptPackages": [
-      "chromium",
       "fonts-liberation",
       "libnss3",
       "libatk1.0-0",
@@ -15,11 +17,17 @@
       "libcups2",
       "libdrm2",
       "libgbm1",
-      "libasound2"
+      "libasound2",
+      "libxkbcommon0",
+      "libxcomposite1",
+      "libxdamage1",
+      "libxfixes3",
+      "libxrandr2",
+      "libpango-1.0-0",
+      "libcairo2"
     ],
     "variables": {
-      "PUPPETEER_SKIP_DOWNLOAD": "true",
-      "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/chromium"
+      "PUPPETEER_CACHE_DIR": "/app/.cache/puppeteer"
     }
   }
 }
