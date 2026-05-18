@@ -358,11 +358,15 @@ function parseShopeeFoodDetailName(data: unknown): string | null {
 async function fetchShopeeFoodMenu(
   url: string
 ): Promise<{ restaurantName: string; items: RawItem[] }> {
+  // On Linux servers we run non-headless so the library auto-spawns Xvfb (a real-browser
+  // detection bypass technique); on Windows local dev we stay headless to avoid UI popups.
+  // Reuse puppeteer's bundled Chromium so we don't need to install google-chrome-stable.
+  const isLinux = process.platform === "linux";
   const { browser, page } = await connectRealBrowser({
-    headless: true,
+    headless: !isLinux,
     turnstile: true,
     args: [],
-    customConfig: {},
+    customConfig: { chromePath: puppeteer.executablePath() },
     connectOption: {},
   });
 

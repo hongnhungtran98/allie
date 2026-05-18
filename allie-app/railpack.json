@@ -24,7 +24,8 @@
       "libxfixes3",
       "libxrandr2",
       "libpango-1.0-0",
-      "libcairo2"
+      "libcairo2",
+      "xvfb"
     ],
     "variables": {
       "PUPPETEER_CACHE_DIR": "/app/.cache/puppeteer"
