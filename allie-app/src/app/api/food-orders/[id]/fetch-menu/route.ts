@@ -2,6 +2,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import puppeteer from "puppeteer";
+import { connect as connectRealBrowser } from "puppeteer-real-browser";
+
+// ShopeeFood note: Shopee Gateway (SGW) silently refuses to load the SPA's menu
+// data when it detects Puppeteer — even with puppeteer-extra + stealth plugin
+// (the plugin stopped working when SGW tightened detection in May 2026).
+// puppeteer-real-browser uses a patched runtime that still passes those checks.
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -272,238 +278,171 @@ async function fetchGrabMenu(
   }
 }
 
-// Parse ShopeeFood API JSON response (gappapi.deliverynow.vn)
-function parseShopeeFoodApiResponse(
-  data: unknown
-): { restaurantName: string; items: RawItem[] } | null {
+// Parse ShopeeFood modifier groups → unified RawItem.options shape.
+// ShopeeFood shape: dish.options[] = [{ name, ntop, mandatory, option_items: { items: [{ name, price: { value } }] } }]
+function parseShopeeFoodOptions(
+  raw: unknown
+): { group: string; choices: { label: string; price: number }[] }[] {
+  if (!Array.isArray(raw)) return [];
+  const result: { group: string; choices: { label: string; price: number }[] }[] = [];
+  for (const g of raw) {
+    const group = g as Record<string, unknown>;
+    const groupName = String(group.name ?? group.ntop ?? "").trim();
+    const optionItems = group.option_items as Record<string, unknown> | undefined;
+    const items = optionItems?.items as unknown[] | undefined;
+    if (!Array.isArray(items)) continue;
+    const choices = items
+      .map((it) => {
+        const item = it as Record<string, unknown>;
+        const label = String(item.name ?? "").trim();
+        const priceObj = item.price as Record<string, unknown> | undefined;
+        const price = Number(priceObj?.value ?? 0);
+        return { label, price };
+      })
+      .filter((c) => c.label);
+    if (choices.length > 0) result.push({ group: groupName, choices });
+  }
+  return result;
+}
+
+// Parse the `dish/get_delivery_dishes` payload (the menu data).
+// Shape: { reply: { menu_infos: [{ dish_type_name, dishes: [{ name, price: { value }, photos: [...], options: [...] }] }] } }
+function parseShopeeFoodDishesPayload(data: unknown): RawItem[] | null {
   if (!data || typeof data !== "object") return null;
   const d = data as Record<string, unknown>;
-
-  // Shape: { reply: { delivery_detail: { restaurant: {...}, menu_infos: [...] } } }
   const reply = d.reply as Record<string, unknown> | undefined;
-  const detail = reply?.delivery_detail as Record<string, unknown> | undefined;
-  if (!detail) return null;
+  const menuInfos = reply?.menu_infos as unknown[] | undefined;
+  if (!Array.isArray(menuInfos)) return null;
 
-  const restaurant = detail.restaurant as Record<string, unknown> | undefined;
-  const menuInfos = detail.menu_infos as unknown[] | undefined;
-  if (!restaurant || !Array.isArray(menuInfos)) return null;
-
-  const restaurantName = String(restaurant.name ?? "ShopeeFood Restaurant");
   const items: RawItem[] = [];
-
   for (const cat of menuInfos) {
-    const foods = (cat as Record<string, unknown>).foods as unknown[] | undefined;
-    if (!Array.isArray(foods)) continue;
-    for (const food of foods) {
-      const f = food as Record<string, unknown>;
+    const dishes = (cat as Record<string, unknown>).dishes as unknown[] | undefined;
+    if (!Array.isArray(dishes)) continue;
+    for (const dish of dishes) {
+      const f = dish as Record<string, unknown>;
+      if (f.is_deleted === true || f.is_active === false) continue;
       const name = String(f.name ?? "").trim();
       if (!name) continue;
 
       const priceObj = f.price as Record<string, unknown> | undefined;
-      const originalPrice = Number(priceObj?.value ?? f.total_price ?? 0);
+      const originalPrice = Number(priceObj?.value ?? 0);
       if (!originalPrice) continue;
 
-      const photos = f.photos as { value?: string }[] | undefined;
-      const imageUrl = photos?.[0]?.value ?? null;
+      // Prefer a mid-size photo (~400px) for nicer UI thumbnails; fall back to first available
+      const photos = f.photos as { width?: number; value?: string }[] | undefined;
+      const preferred = photos?.find((p) => p.width === 400) ?? photos?.[Math.min(2, (photos?.length ?? 1) - 1)] ?? photos?.[0];
+      const imageUrl = preferred?.value ?? null;
 
       const discountedRaw = Number(f.discount_price ?? 0);
       const discountedPrice =
         discountedRaw > 0 && discountedRaw !== originalPrice ? discountedRaw : null;
 
-      items.push({ name, imageUrl, originalPrice, discountedPrice, options: [] });
+      const options = parseShopeeFoodOptions(f.options ?? []);
+
+      items.push({ name, imageUrl, originalPrice, discountedPrice, options });
     }
   }
-
-  return items.length > 0 ? { restaurantName, items } : null;
+  return items.length > 0 ? items : null;
 }
 
-const CITY_SLUG_TO_ID: Record<string, string> = {
-  "ho-chi-minh": "217",
-  "ha-noi": "56",
-  "da-nang": "330",
-  "can-tho": "1",
-  "hai-phong": "3",
-  "bien-hoa": "136",
-  "vung-tau": "4",
-  "nha-trang": "19",
-  "hue": "5",
-};
-
-const FOODY_HEADERS = {
-  "x-foody-client-id": "1",
-  "x-foody-client-version": "5",
-  "x-foody-api-version": "2",
-  "x-foody-client-language": "vi",
-};
+// Extract restaurant name from the `delivery/get_detail` payload.
+function parseShopeeFoodDetailName(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const d = data as Record<string, unknown>;
+  const reply = d.reply as Record<string, unknown> | undefined;
+  const detail = reply?.delivery_detail as Record<string, unknown> | undefined;
+  const name = detail?.name;
+  return typeof name === "string" && name.trim() ? name.trim() : null;
+}
 
 async function fetchShopeeFoodMenu(
   url: string
 ): Promise<{ restaurantName: string; items: RawItem[] }> {
-  const pathname = new URL(url).pathname;
-  const parts = pathname.split("/").filter(Boolean);
-  const citySlug = parts[0] ?? "";
-  const restaurantSlug = parts[1] ?? "";
-  const cityId = CITY_SLUG_TO_ID[citySlug] ?? "217";
-
-  const fallbackName = restaurantSlug
-    .split("-")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ") || "ShopeeFood Restaurant";
-
-  const browser = await puppeteer.launch({
+  const { browser, page } = await connectRealBrowser({
     headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--disable-blink-features=AutomationControlled",
-      "--window-size=1366,768",
-    ],
+    turnstile: true,
+    args: [],
+    customConfig: {},
+    connectOption: {},
   });
+
   try {
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1366, height: 768 });
-
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, "webdriver", { get: () => false });
-      (window as Window & { chrome?: unknown }).chrome = {
-        runtime: {},
-        loadTimes: () => ({}),
-        csi: () => ({}),
-        app: {},
-      };
-      Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
-      Object.defineProperty(navigator, "languages", {
-        get: () => ["vi-VN", "vi", "en-US", "en"],
-      });
-    });
-
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    );
-
-    // Pre-set city cookie — app needs this to skip city-selection step and load restaurant data
-    await page.browserContext().setCookie({
-      name: "city_id",
-      value: cityId,
-      domain: ".shopeefood.vn",
-      path: "/",
-    });
-
-    await page.setRequestInterception(true);
-    page.on("request", (req) => {
-      if (req.url().includes("deliverynow.vn") || req.url().includes("shopeefood.vn/api")) {
-        console.log("[ShopeeFood REQ]", req.method(), req.url().slice(0, 100));
-        req.continue({ headers: { ...req.headers(), ...FOODY_HEADERS } });
-      } else {
-        req.continue();
-      }
-    });
-
+    let detailJson: unknown = null;
+    let dishesJson: unknown = null;
     const pending: Promise<void>[] = [];
-    let capturedData: { restaurantName: string; items: RawItem[] } | null = null;
 
-    page.on("response", (response) => {
-      if (capturedData) return;
-      if (!response.url().includes("deliverynow.vn")) return;
-      console.log("[ShopeeFood RES]", response.status(), response.url().slice(0, 100));
+    page.on("response", (response: { url: () => string; headers: () => Record<string, string>; json: () => Promise<unknown> }) => {
+      const ru = response.url();
+      if (!ru.includes("deliverynow.vn")) return;
       const ct = response.headers()["content-type"] ?? "";
       if (!ct.includes("json")) return;
 
-      const p = response
-        .json()
-        .then((json) => {
-          const parsed = parseShopeeFoodApiResponse(json);
-          if (parsed && !capturedData) capturedData = parsed;
-        })
-        .catch(() => {});
-      pending.push(p);
+      const isDetail = ru.includes("/delivery/get_detail");
+      const isDishes = ru.includes("/dish/get_delivery_dishes");
+      if (!isDetail && !isDishes) return;
+      if ((isDetail && detailJson) || (isDishes && dishesJson)) return;
+
+      pending.push(
+        response
+          .json()
+          .then((json) => {
+            if (isDetail && !detailJson) detailJson = json;
+            if (isDishes && !dishesJson) dishesJson = json;
+          })
+          .catch(() => {})
+      );
     });
 
-    // Track when the main metadata call completes so we know cookies are set
-    let metadataReady = false;
-    page.on("response", (response) => {
-      if (response.url().includes("get_metadata") && !response.url().includes("minimal")) {
-        metadataReady = true;
-      }
-    });
-
-    // Log JS errors that may explain why the app is stuck
-    page.on("console", (msg) => {
-      if (msg.type() === "error") console.log("[ShopeeFood JS]", msg.text().slice(0, 120));
-    });
-    page.on("pageerror", (err) => {
-      console.log("[ShopeeFood PageError]", String(err).slice(0, 120));
-    });
+    // Visit homepage first so Shopee can set its session cookies before the SPA
+    // on the shop page calls the dish API.
+    try {
+      await page.goto("https://shopeefood.vn/", { waitUntil: "domcontentloaded", timeout: 20000 });
+    } catch {
+      // best-effort warmup
+    }
 
     try {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     } catch {
-      // timeout OK
+      // navigation timeout is acceptable; we wait below for the API responses
     }
 
-    // Wait for metadata to land (max 10 s), then try direct API immediately
+    // Poll up to 25 s for both API responses to arrive
     await new Promise<void>((resolve) => {
       const start = Date.now();
       const tick = setInterval(async () => {
         await Promise.all(pending.splice(0));
-        if (capturedData || metadataReady || Date.now() - start > 10_000) {
+        if ((detailJson && dishesJson) || Date.now() - start > 25_000) {
           clearInterval(tick);
           resolve();
         }
-      }, 300);
+      }, 400);
     });
 
-    if (capturedData) return capturedData;
-
-    // Direct API from browser context — cookies are now set from metadata calls
-    const searchName = restaurantSlug.replace(/-/g, " ");
-    console.log("[ShopeeFood] Direct API attempt — slug:", restaurantSlug, "city:", cityId);
-
-    const directResult = await page.evaluate(
-      async (
-        slug: string,
-        cid: string,
-        name: string,
-        headers: Record<string, string>
-      ) => {
-        const candidates = [
-          `https://gappapi.deliverynow.vn/api/v2/delivery/get_delivery?url_name=${encodeURIComponent(slug)}&city_id=${cid}`,
-          `https://gappapi.deliverynow.vn/api/v1/delivery/get_delivery?url_name=${encodeURIComponent(slug)}&city_id=${cid}`,
-          `https://gappapi.deliverynow.vn/api/v2/delivery/get_detail?url_name=${encodeURIComponent(slug)}&city_id=${cid}`,
-          `https://gappapi.deliverynow.vn/api/v1/search/search_now?keyword=${encodeURIComponent(name)}&city_id=${cid}&foody_client_id=3`,
-        ];
-        const log: string[] = [];
-        for (const endpoint of candidates) {
-          try {
-            const res = await fetch(endpoint, { headers, credentials: "include" });
-            const body = await res.text();
-            log.push(`${res.status} ${endpoint.slice(40, 110)} → ${body.slice(0, 120)}`);
-            if (res.ok) {
-              const json = JSON.parse(body) as Record<string, unknown>;
-              if (json?.reply) return { json, log };
-            }
-          } catch (e) {
-            log.push(`ERR ${endpoint.slice(40, 110)} → ${String(e).slice(0, 60)}`);
-          }
+    // Fallback: if get_detail landed but the dishes call didn't fire, call it directly
+    // using the delivery_id we already have. Top-level navigation bypasses CORS.
+    if (detailJson && !dishesJson) {
+      const detail = (detailJson as Record<string, unknown>)?.reply as
+        | Record<string, unknown>
+        | undefined;
+      const dd = detail?.delivery_detail as Record<string, unknown> | undefined;
+      const deliveryId = dd?.id;
+      if (typeof deliveryId === "number" || typeof deliveryId === "string") {
+        const apiUrl = `https://gappapi.deliverynow.vn/api/dish/get_delivery_dishes?id_type=2&request_id=${deliveryId}`;
+        try {
+          await page.goto(apiUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
+          const bodyText = await page.evaluate(() => document.body.innerText);
+          if (bodyText.trim().startsWith("{")) dishesJson = JSON.parse(bodyText);
+        } catch {
+          // fall through to empty result
         }
-        return { json: null, log };
-      },
-      restaurantSlug,
-      cityId,
-      searchName,
-      FOODY_HEADERS
-    );
-
-    console.log("[ShopeeFood] Direct API log:\n", directResult.log.join("\n"));
-    if (directResult.json) {
-      const parsed = parseShopeeFoodApiResponse(directResult.json);
-      if (parsed) return parsed;
-      console.log("[ShopeeFood] Unknown response shape:", JSON.stringify(directResult.json).slice(0, 400));
+      }
     }
 
-    return { restaurantName: fallbackName, items: [] };
+    const restaurantName =
+      parseShopeeFoodDetailName(detailJson) ?? "ShopeeFood Restaurant";
+    const items = parseShopeeFoodDishesPayload(dishesJson) ?? [];
+    return { restaurantName, items };
   } finally {
     await browser.close();
   }

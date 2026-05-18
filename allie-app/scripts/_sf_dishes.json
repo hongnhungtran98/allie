@@ -1,0 +1,949 @@
+{
+  "reply": {
+    "menu_infos": [
+      {
+        "dish_type_id": 7401791,
+        "dish_type_name": "Món Chính( không kèm dụng cụ ăn uống )",
+        "dishes": [
+          {
+            "is_deleted": false,
+            "description": "Tô thường size L gồm thịt heo quay, chả cá, mực ( không kèm dụng cụ ăn uống )",
+            "price": {
+              "text": "60.000đ",
+              "unit": "đ",
+              "value": 60000
+            },
+            "is_active": true,
+            "display_order": 0,
+            "total_like": "9",
+            "properties": [],
+            "photos": [
+              {
+                "width": 120,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k14u5qw9l28@resize_ss120x120!@crop_w120_h120_cT",
+                "height": 120
+              },
+              {
+                "width": 180,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k14u5qw9l28@resize_ss180x180!@crop_w180_h180_cT",
+                "height": 180
+              },
+              {
+                "width": 400,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k14u5qw9l28@resize_ss400x400!@crop_w400_h400_cT",
+                "height": 400
+              },
+              {
+                "width": 560,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k14u5qw9l28@resize_ss560x560!@crop_w560_h560_cT",
+                "height": 560
+              },
+              {
+                "width": 750,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k14u5qw9l28@resize_ss750x750!@crop_w750_h750_cT",
+                "height": 750
+              },
+              {
+                "width": 1242,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k14u5qw9l28@resize_ss1242x1242!@crop_w1242_h1242_cT",
+                "height": 1242
+              }
+            ],
+            "options": [
+              {
+                "ntop": "",
+                "mandatory": false,
+                "id": 1722873,
+                "option_items": {
+                  "min_select": 0,
+                  "max_select": 6,
+                  "items": [
+                    {
+                      "name": "Cà tím",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658176,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "15.000đ",
+                        "value": 15000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Bún thêm",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658177,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "20.000đ",
+                        "value": 20000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Heo quay ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658178,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "55.000đ",
+                        "value": 55000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Mực ( mực nhỏ ) ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658179,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "55.000đ",
+                        "value": 55000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Tôm",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658180,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "55.000đ",
+                        "value": 55000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Mực lẩu ( mực nang nguyên con ) ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 18025326,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "80.000đ",
+                        "value": 80000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Nước lẩu thêm ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 18025327,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "45.000đ",
+                        "value": 45000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Rau lẩu thêm ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 18025328,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "45.000đ",
+                        "value": 45000,
+                        "unit": "đ"
+                      }
+                    }
+                  ]
+                },
+                "name": "Món thêm"
+              }
+            ],
+            "is_available": true,
+            "is_group_discount_item": true,
+            "time": {
+              "available": [],
+              "week_days": [
+                {
+                  "start": "00:00",
+                  "week_day": 1,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 2,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 3,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 4,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 5,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 6,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 7,
+                  "end": "23:59"
+                }
+              ],
+              "not_available": []
+            },
+            "quantity": 0,
+            "id": 164722816,
+            "mms_image": "vn-11134517-7r98o-ly0k14u5qw9l28",
+            "name": "Bún mắm ( tô thường )"
+          },
+          {
+            "is_deleted": false,
+            "description": "Tô đặc biệt size XL gồm thịt heo quay, chả cá, mực, tôm ( không kèm dụng cụ ăn uống )",
+            "price": {
+              "text": "80.000đ",
+              "unit": "đ",
+              "value": 80000
+            },
+            "is_active": true,
+            "display_order": 0,
+            "total_like": "10+",
+            "properties": [],
+            "photos": [
+              {
+                "width": 120,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k33oc1m1n9f@resize_ss120x120!@crop_w120_h120_cT",
+                "height": 120
+              },
+              {
+                "width": 180,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k33oc1m1n9f@resize_ss180x180!@crop_w180_h180_cT",
+                "height": 180
+              },
+              {
+                "width": 400,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k33oc1m1n9f@resize_ss400x400!@crop_w400_h400_cT",
+                "height": 400
+              },
+              {
+                "width": 560,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k33oc1m1n9f@resize_ss560x560!@crop_w560_h560_cT",
+                "height": 560
+              },
+              {
+                "width": 750,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k33oc1m1n9f@resize_ss750x750!@crop_w750_h750_cT",
+                "height": 750
+              },
+              {
+                "width": 1242,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k33oc1m1n9f@resize_ss1242x1242!@crop_w1242_h1242_cT",
+                "height": 1242
+              }
+            ],
+            "options": [
+              {
+                "ntop": "",
+                "mandatory": false,
+                "id": 1722873,
+                "option_items": {
+                  "min_select": 0,
+                  "max_select": 6,
+                  "items": [
+                    {
+                      "name": "Cà tím",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658176,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "15.000đ",
+                        "value": 15000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Bún thêm",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658177,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "20.000đ",
+                        "value": 20000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Heo quay ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658178,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "55.000đ",
+                        "value": 55000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Mực ( mực nhỏ ) ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658179,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "55.000đ",
+                        "value": 55000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Tôm",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658180,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "55.000đ",
+                        "value": 55000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Mực lẩu ( mực nang nguyên con ) ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 18025326,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "80.000đ",
+                        "value": 80000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Nước lẩu thêm ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 18025327,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "45.000đ",
+                        "value": 45000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Rau lẩu thêm ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 18025328,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "45.000đ",
+                        "value": 45000,
+                        "unit": "đ"
+                      }
+                    }
+                  ]
+                },
+                "name": "Món thêm"
+              }
+            ],
+            "is_available": true,
+            "is_group_discount_item": true,
+            "time": {
+              "available": [],
+              "week_days": [
+                {
+                  "start": "00:00",
+                  "week_day": 1,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 2,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 3,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 4,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 5,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 6,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 7,
+                  "end": "23:59"
+                }
+              ],
+              "not_available": []
+            },
+            "quantity": 0,
+            "id": 164722818,
+            "mms_image": "vn-11134517-7r98o-ly0k33oc1m1n9f",
+            "name": "Bún mắm tô đặc biệt"
+          },
+          {
+            "is_deleted": false,
+            "description": "",
+            "price": {
+              "text": "5.000đ",
+              "unit": "đ",
+              "value": 5000
+            },
+            "is_active": true,
+            "display_order": 0,
+            "total_like": "0",
+            "properties": [],
+            "photos": [
+              {
+                "width": 120,
+                "value": "https://mms.img.susercontent.com/vn-11134517-820l4-mea8azx4t0jr28@resize_ss120x120!@crop_w120_h120_cT",
+                "height": 120
+              },
+              {
+                "width": 180,
+                "value": "https://mms.img.susercontent.com/vn-11134517-820l4-mea8azx4t0jr28@resize_ss180x180!@crop_w180_h180_cT",
+                "height": 180
+              },
+              {
+                "width": 400,
+                "value": "https://mms.img.susercontent.com/vn-11134517-820l4-mea8azx4t0jr28@resize_ss400x400!@crop_w400_h400_cT",
+                "height": 400
+              },
+              {
+                "width": 560,
+                "value": "https://mms.img.susercontent.com/vn-11134517-820l4-mea8azx4t0jr28@resize_ss560x560!@crop_w560_h560_cT",
+                "height": 560
+              },
+              {
+                "width": 750,
+                "value": "https://mms.img.susercontent.com/vn-11134517-820l4-mea8azx4t0jr28@resize_ss750x750!@crop_w750_h750_cT",
+                "height": 750
+              },
+              {
+                "width": 1242,
+                "value": "https://mms.img.susercontent.com/vn-11134517-820l4-mea8azx4t0jr28@resize_ss1242x1242!@crop_w1242_h1242_cT",
+                "height": 1242
+              }
+            ],
+            "options": [],
+            "is_available": true,
+            "is_group_discount_item": true,
+            "time": {
+              "available": [],
+              "week_days": [
+                {
+                  "start": "00:00",
+                  "week_day": 1,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 2,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 3,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 4,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 5,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 6,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 7,
+                  "end": "23:59"
+                }
+              ],
+              "not_available": []
+            },
+            "quantity": 0,
+            "id": 281026785,
+            "mms_image": "vn-11134517-820l4-mea8azx4t0jr28",
+            "name": "Dụng cụ ăn uống"
+          },
+          {
+            "is_deleted": false,
+            "description": "Gồm thịt heo quay, chả cá, tôm, mực, đầu cá hồi , rau , bún",
+            "price": {
+              "text": "380.000đ",
+              "unit": "đ",
+              "value": 380000
+            },
+            "is_active": true,
+            "display_order": 0,
+            "total_like": "0",
+            "properties": [],
+            "photos": [
+              {
+                "width": 120,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k3tzvj00r9b@resize_ss120x120!@crop_w120_h120_cT",
+                "height": 120
+              },
+              {
+                "width": 180,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k3tzvj00r9b@resize_ss180x180!@crop_w180_h180_cT",
+                "height": 180
+              },
+              {
+                "width": 400,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k3tzvj00r9b@resize_ss400x400!@crop_w400_h400_cT",
+                "height": 400
+              },
+              {
+                "width": 560,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k3tzvj00r9b@resize_ss560x560!@crop_w560_h560_cT",
+                "height": 560
+              },
+              {
+                "width": 750,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k3tzvj00r9b@resize_ss750x750!@crop_w750_h750_cT",
+                "height": 750
+              },
+              {
+                "width": 1242,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7r98o-ly0k3tzvj00r9b@resize_ss1242x1242!@crop_w1242_h1242_cT",
+                "height": 1242
+              }
+            ],
+            "options": [
+              {
+                "ntop": "",
+                "mandatory": false,
+                "id": 1722873,
+                "option_items": {
+                  "min_select": 0,
+                  "max_select": 6,
+                  "items": [
+                    {
+                      "name": "Cà tím",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658176,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "15.000đ",
+                        "value": 15000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Bún thêm",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658177,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "20.000đ",
+                        "value": 20000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Heo quay ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658178,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "55.000đ",
+                        "value": 55000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Mực ( mực nhỏ ) ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658179,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "55.000đ",
+                        "value": 55000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Tôm",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 9658180,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "55.000đ",
+                        "value": 55000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Mực lẩu ( mực nang nguyên con ) ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 18025326,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "80.000đ",
+                        "value": 80000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Nước lẩu thêm ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 18025327,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "45.000đ",
+                        "value": 45000,
+                        "unit": "đ"
+                      }
+                    },
+                    {
+                      "name": "Rau lẩu thêm ",
+                      "weight": 1,
+                      "ntop_price": {
+                        "text": "0đ",
+                        "value": 0,
+                        "unit": "đ"
+                      },
+                      "max_quantity": 1,
+                      "id": 18025328,
+                      "is_default": false,
+                      "top_order": 0,
+                      "price": {
+                        "text": "45.000đ",
+                        "value": 45000,
+                        "unit": "đ"
+                      }
+                    }
+                  ]
+                },
+                "name": "Món thêm"
+              }
+            ],
+            "is_available": true,
+            "is_group_discount_item": true,
+            "time": {
+              "available": [],
+              "week_days": [
+                {
+                  "start": "00:00",
+                  "week_day": 1,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 2,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 3,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 4,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 5,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 6,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 7,
+                  "end": "23:59"
+                }
+              ],
+              "not_available": []
+            },
+            "quantity": 0,
+            "id": 164722819,
+            "mms_image": "vn-11134517-7r98o-ly0k3tzvj00r9b",
+            "name": "Lẩu mắm ( nhỏ )"
+          },
+          {
+            "is_deleted": false,
+            "description": "Tôm + mực + heo quay + chả cá + đầu cá hồi + rau + bún",
+            "price": {
+              "text": "500.000đ",
+              "unit": "đ",
+              "value": 500000
+            },
+            "is_active": true,
+            "display_order": 0,
+            "total_like": "0",
+            "properties": [],
+            "photos": [
+              {
+                "width": 120,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7ras8-mbfhlpq7wi109c@resize_ss120x120!@crop_w120_h120_cT",
+                "height": 120
+              },
+              {
+                "width": 180,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7ras8-mbfhlpq7wi109c@resize_ss180x180!@crop_w180_h180_cT",
+                "height": 180
+              },
+              {
+                "width": 400,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7ras8-mbfhlpq7wi109c@resize_ss400x400!@crop_w400_h400_cT",
+                "height": 400
+              },
+              {
+                "width": 560,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7ras8-mbfhlpq7wi109c@resize_ss560x560!@crop_w560_h560_cT",
+                "height": 560
+              },
+              {
+                "width": 750,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7ras8-mbfhlpq7wi109c@resize_ss750x750!@crop_w750_h750_cT",
+                "height": 750
+              },
+              {
+                "width": 1242,
+                "value": "https://mms.img.susercontent.com/vn-11134517-7ras8-mbfhlpq7wi109c@resize_ss1242x1242!@crop_w1242_h1242_cT",
+                "height": 1242
+              }
+            ],
+            "options": [],
+            "is_available": true,
+            "is_group_discount_item": true,
+            "time": {
+              "available": [],
+              "week_days": [
+                {
+                  "start": "00:00",
+                  "week_day": 1,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 2,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 3,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 4,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 5,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 6,
+                  "end": "23:59"
+                },
+                {
+                  "start": "00:00",
+                  "week_day": 7,
+                  "end": "23:59"
+                }
+              ],
+              "not_available": []
+            },
+            "quantity": 0,
+            "id": 178833472,
+            "mms_image": "vn-11134517-7ras8-mbfhlpq7wi109c",
+            "name": "Lẩu mắm ( lớn )"
+          }
+        ]
+      }
+    ]
+  },
+  "result": "success"
+}

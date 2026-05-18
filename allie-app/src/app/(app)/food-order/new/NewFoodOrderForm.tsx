@@ -15,12 +15,13 @@ export default function NewFoodOrderForm() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  function isGrabFoodUrl(url: string) {
+  function isSupportedFoodUrl(url: string) {
     try {
       const u = new URL(url);
       return (
         /(^|\.)food\.grab\.com$/i.test(u.hostname) ||
-        /^r\.grab\.com$/i.test(u.hostname)
+        /^r\.grab\.com$/i.test(u.hostname) ||
+        /(^|\.)shopeefood\.vn$/i.test(u.hostname)
       );
     } catch {
       return false;
@@ -32,8 +33,8 @@ export default function NewFoodOrderForm() {
     const trimmed = sourceUrl.trim();
     if (!trimmed) e.sourceUrl = "Source URL is required";
     else if (!trimmed.startsWith("http")) e.sourceUrl = "Enter a valid URL";
-    else if (!isGrabFoodUrl(trimmed))
-      e.sourceUrl = "Hiện tại chỉ hỗ trợ link từ GrabFood (food.grab.com hoặc r.grab.com). ShopeeFood và các nguồn khác chưa được hỗ trợ.";
+    else if (!isSupportedFoodUrl(trimmed))
+      e.sourceUrl = "Hiện tại chỉ hỗ trợ link từ GrabFood (food.grab.com, r.grab.com) hoặc ShopeeFood (shopeefood.vn).";
     if (countdownMinutes && parseInt(countdownMinutes) <= 0)
       e.countdownMinutes = "Countdown must be a positive number";
     return e;
@@ -99,15 +100,15 @@ export default function NewFoodOrderForm() {
           onBlur={() => {
             const trimmed = sourceUrl.trim();
             if (!trimmed) setErrors((p) => ({ ...p, sourceUrl: "Source URL is required" }));
-            else if (!isGrabFoodUrl(trimmed))
+            else if (!isSupportedFoodUrl(trimmed))
               setErrors((p) => ({
                 ...p,
                 sourceUrl:
-                  "Hiện tại chỉ hỗ trợ link từ GrabFood (food.grab.com hoặc r.grab.com). ShopeeFood và các nguồn khác chưa được hỗ trợ.",
+                  "Hiện tại chỉ hỗ trợ link từ GrabFood (food.grab.com, r.grab.com) hoặc ShopeeFood (shopeefood.vn).",
               }));
             else setErrors((p) => { const n = { ...p }; delete n.sourceUrl; return n; });
           }}
-          placeholder="https://food.grab.com/..."
+          placeholder="https://food.grab.com/... hoặc https://shopeefood.vn/..."
           className={`w-full px-3 py-2 text-sm border rounded-xl bg-bg focus:outline-none focus:ring-2 focus:ring-lavender-500 ${
             errors.sourceUrl ? "border-red-400" : "border-border"
           }`}
