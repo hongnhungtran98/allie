@@ -362,6 +362,17 @@ async function fetchShopeeFoodMenu(
   // detection bypass technique); on Windows local dev we stay headless to avoid UI popups.
   // Reuse puppeteer's bundled Chromium so we don't need to install google-chrome-stable.
   const isLinux = process.platform === "linux";
+  if (isLinux) {
+    // One-shot diagnostic so we can tell apt vs PATH issues apart in Railway logs.
+    try {
+      const { execSync } = await import("node:child_process");
+      const xvfbRun = execSync("which xvfb-run 2>/dev/null || echo MISSING", { encoding: "utf8" }).trim();
+      const xvfbBin = execSync("which Xvfb 2>/dev/null || echo MISSING", { encoding: "utf8" }).trim();
+      console.log("[ShopeeFood] xvfb diag — xvfb-run:", xvfbRun, " Xvfb:", xvfbBin);
+    } catch (e) {
+      console.log("[ShopeeFood] xvfb diag failed:", String(e).slice(0, 120));
+    }
+  }
   const { browser, page } = await connectRealBrowser({
     headless: !isLinux,
     turnstile: true,
