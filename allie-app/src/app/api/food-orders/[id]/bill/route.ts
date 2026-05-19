@@ -33,7 +33,7 @@ export async function GET(_req: Request, { params }: Params) {
     const basePrice = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
     const options = (sel.selectedOptions as { price: number }[] | null) ?? [];
     const addOns = options.reduce((a, o) => a + (o.price ?? 0), 0);
-    const unitPrice = basePrice + addOns;
+    const unitPrice = sel.priceOverride ?? basePrice + addOns;
     if (!byUser[uid]) byUser[uid] = { userName: sel.user.name, items: [], subtotal: 0 };
     byUser[uid].items.push({ name: sel.menuItem.name, price: unitPrice, quantity: sel.quantity });
     byUser[uid].subtotal += unitPrice * sel.quantity;

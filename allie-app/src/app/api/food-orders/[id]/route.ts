@@ -91,11 +91,8 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json(updated);
   }
 
-  // Allow updating shipping fee and/or discount while order is open
+  // Allow host to update shipping fee and/or discount (even after close, e.g. final bill tweaks)
   if (body.shippingFee !== undefined || body.discount !== undefined) {
-    if (order.status !== "open")
-      return NextResponse.json({ error: "Order is not open" }, { status: 400 });
-
     const data: { shippingFee?: number; discount?: number } = {};
     if (body.shippingFee !== undefined) {
       const v = Number(body.shippingFee);

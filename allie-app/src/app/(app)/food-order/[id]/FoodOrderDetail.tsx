@@ -26,6 +26,7 @@ interface SelectionItem {
   selectedOptions: { group: string; choice: string; price: number }[];
   note: string | null;
   ordered: boolean;
+  priceOverride: number | null;
   user: { id: string; name: string; email: string };
   menuItem: MenuItem;
 }
@@ -98,6 +99,12 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
     Object.fromEntries(order.selections.map((s) => [s.id, s.ordered ?? false])),
   );
   const [pendingOrdered, setPendingOrdered] = useState<Record<string, boolean>>({});
+  const [priceOverrideMap, setPriceOverrideMap] = useState<Record<string, number | null>>(() =>
+    Object.fromEntries(order.selections.map((s) => [s.id, s.priceOverride ?? null])),
+  );
+  const [editingPrice, setEditingPrice] = useState<string | null>(null);
+  const [priceDraft, setPriceDraft] = useState("");
+  const [savingPrice, setSavingPrice] = useState(false);
 
   const isOrderer = order.creator.id === currentUserId;
 
@@ -126,6 +133,66 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
       });
     }
   }
+  function defaultUnitPrice(sel: SelectionItem) {
+    const base = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
+    const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
+    return base + addOns;
+  }
+
+  function startEditPrice(sel: SelectionItem) {
+    const current = priceOverrideMap[sel.id] ?? defaultUnitPrice(sel);
+    setEditingPrice(sel.id);
+    setPriceDraft(String(current));
+  }
+
+  async function savePrice(sel: SelectionItem) {
+    const value = Number(priceDraft);
+    if (!Number.isFinite(value) || value < 0) {
+      toast("error", "Enter a non-negative number");
+      return;
+    }
+    setSavingPrice(true);
+    try {
+      const res = await fetch(`/api/food-orders/${order.id}/selections/${sel.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: Math.round(value) }),
+      });
+      if (res.ok) {
+        setPriceOverrideMap((m) => ({ ...m, [sel.id]: Math.round(value) }));
+        setEditingPrice(null);
+        toast("success", "Updated");
+        if (status === "closed") loadBill();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast("error", err.error ?? "Failed to update");
+      }
+    } finally {
+      setSavingPrice(false);
+    }
+  }
+
+  async function resetPrice(sel: SelectionItem) {
+    setSavingPrice(true);
+    try {
+      const res = await fetch(`/api/food-orders/${order.id}/selections/${sel.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null }),
+      });
+      if (res.ok) {
+        setPriceOverrideMap((m) => ({ ...m, [sel.id]: null }));
+        setEditingPrice(null);
+        toast("success", "Reset to menu price");
+        if (status === "closed") loadBill();
+      } else {
+        toast("error", "Failed to reset");
+      }
+    } finally {
+      setSavingPrice(false);
+    }
+  }
+
   const [menuExpanded, setMenuExpanded] = useState(false);
   const [countdownEnd, setCountdownEnd] = useState(order.countdownEnd);
   const [extensionCount, setExtensionCount] = useState(order.extensionCount ?? 0);
@@ -136,7 +203,7 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
   const [feeDraft, setFeeDraft] = useState("");
   const [savingFee, setSavingFee] = useState(false);
 
-  const canEditFees = status === "open" && order.creator.id === currentUserId;
+  const canEditFees = order.creator.id === currentUserId;
 
   function startEdit(kind: "shipping" | "discount") {
     setEditingFee(kind);
@@ -281,9 +348,8 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
   // Per-person item subtotal includes base price + selectedOptions add-ons.
   const userSubtotals = Object.entries(byUser).map(([uid, { userName, items }]) => {
     const subtotal = items.reduce((sum, sel) => {
-      const base = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
-      const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
-      return sum + (base + addOns) * sel.quantity;
+      const unit = priceOverrideMap[sel.id] ?? defaultUnitPrice(sel);
+      return sum + unit * sel.quantity;
     }, 0);
     return { uid, userName, subtotal };
   });
@@ -522,10 +588,13 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
                   <p className="text-sm font-semibold text-ink mb-2">{userName}</p>
                   <div className="space-y-1">
                     {items.map((sel) => {
-                      const basePrice = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
-                      const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
-                      const lineTotal = (basePrice + addOns) * sel.quantity;
+                      const defaultUnit = defaultUnitPrice(sel);
+                      const override = priceOverrideMap[sel.id] ?? null;
+                      const unit = override ?? defaultUnit;
+                      const lineTotal = unit * sel.quantity;
                       const isOrdered = orderedMap[sel.id] ?? false;
+                      const isEditingThis = editingPrice === sel.id;
+                      const isOverridden = override !== null;
                       return (
                         <div key={sel.id} className="flex items-start justify-between text-sm gap-2">
                           <div className={`flex-1 min-w-0 ${isOrdered ? "line-through opacity-60" : ""}`}>
@@ -538,10 +607,65 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
                                 + {sel.selectedOptions.map((o) => o.choice).join(", ")}
                               </span>
                             )}
+                            {isOverridden && (
+                              <span className="text-[10px] text-amber-600 block">
+                                Edited (menu: {defaultUnit.toLocaleString("vi-VN")}₫)
+                              </span>
+                            )}
                           </div>
-                          <span className={`text-ink-soft shrink-0 ${isOrdered ? "line-through opacity-60" : ""}`}>
-                            {lineTotal.toLocaleString("vi-VN")}₫
-                          </span>
+                          {isOrderer && isEditingThis ? (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <input
+                                type="number"
+                                min={0}
+                                autoFocus
+                                value={priceDraft}
+                                onChange={(e) => setPriceDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") savePrice(sel);
+                                  else if (e.key === "Escape") setEditingPrice(null);
+                                }}
+                                disabled={savingPrice}
+                                className="w-20 px-2 py-1 text-xs border border-border rounded-lg bg-bg text-ink focus:outline-none focus:border-lavender-400"
+                              />
+                              <button
+                                onClick={() => savePrice(sel)}
+                                disabled={savingPrice}
+                                className="px-1.5 py-1 text-[10px] font-medium text-white bg-lavender-500 hover:bg-lavender-600 rounded-md disabled:opacity-50"
+                              >
+                                Save
+                              </button>
+                              {isOverridden && (
+                                <button
+                                  onClick={() => resetPrice(sel)}
+                                  disabled={savingPrice}
+                                  className="px-1.5 py-1 text-[10px] text-ink-soft hover:text-ink"
+                                  title="Reset to menu price"
+                                >
+                                  ↺
+                                </button>
+                              )}
+                              <button
+                                onClick={() => setEditingPrice(null)}
+                                disabled={savingPrice}
+                                className="px-1 py-1 text-[10px] text-ink-soft hover:text-ink"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => isOrderer && startEditPrice(sel)}
+                              disabled={!isOrderer}
+                              className={`shrink-0 ${isOrdered ? "line-through opacity-60" : ""} ${
+                                isOverridden ? "text-amber-600 font-medium" : "text-ink-soft"
+                              } ${isOrderer ? "hover:underline cursor-pointer" : "cursor-default"}`}
+                              title={isOrderer ? "Click to edit price" : undefined}
+                            >
+                              {lineTotal.toLocaleString("vi-VN")}₫
+                            </button>
+                          )}
                           {isOrderer && (
                             <input
                               type="checkbox"

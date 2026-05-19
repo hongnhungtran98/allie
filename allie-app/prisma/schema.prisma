@@ -163,6 +163,7 @@ model FoodOrderSelection {
   selectedOptions Json     @default("[]")
   note            String?
   ordered         Boolean  @default(false)
+  priceOverride   Int?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
