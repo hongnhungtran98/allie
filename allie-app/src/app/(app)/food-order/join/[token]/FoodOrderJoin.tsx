@@ -307,6 +307,16 @@ export default function FoodOrderJoin({
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
+                    {item.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        loading="lazy"
+                        className="w-14 h-14 rounded-lg object-cover shrink-0 bg-bg"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      />
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-ink">{item.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
