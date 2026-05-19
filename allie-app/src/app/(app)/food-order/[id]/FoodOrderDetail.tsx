@@ -305,9 +305,7 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
   function exportBillData() {
     const items: [string, number, string][] = [];
     for (const sel of order.selections) {
-      const base = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
-      const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
-      const unitPrice = base + addOns;
+      const unitPrice = priceOverrideMap[sel.id] ?? defaultUnitPrice(sel);
       for (let i = 0; i < sel.quantity; i++) {
         items.push([sel.user.email, unitPrice, sel.menuItem.name]);
       }
