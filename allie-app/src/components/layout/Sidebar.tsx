@@ -17,6 +17,11 @@ const navItems = [
   { href: "/settings",       label: "Settings",      icon: "⚙️" },
 ];
 
+const adminNavItems = [
+  { href: "/users",          label: "Users",         icon: "👥" },
+  { href: "/access-logs",    label: "Access Log",    icon: "🛡️" },
+];
+
 interface SidebarProps {
   userName: string;
   userRole: string;
@@ -55,7 +60,7 @@ export default function Sidebar({ userName, userRole }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 px-3 space-y-0.5">
-        {navItems.map((item) => {
+        {[...navItems, ...(userRole === "ADMIN" ? adminNavItems : [])].map((item) => {
           const active = pathname.startsWith(item.href);
           const isInbox = item.href === "/notifications";
           const badge = isInbox && unreadCount > 0 ? unreadCount : 0;

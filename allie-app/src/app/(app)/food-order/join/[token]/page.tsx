@@ -16,8 +16,11 @@ export default async function FoodOrderJoinPage({ params }: Props) {
       creator: { select: { id: true, name: true } },
       menuItems: { where: { isAvailable: true }, orderBy: { name: "asc" } },
       selections: {
-        where: { userId },
-        include: { menuItem: true },
+        include: {
+          user: { select: { id: true, name: true } },
+          menuItem: true,
+        },
+        orderBy: { createdAt: "asc" },
       },
     },
   });
@@ -33,18 +36,14 @@ export default async function FoodOrderJoinPage({ params }: Props) {
   // When closed, compute how much this member owes (matches docs/formular/Tính tiền Bill.xlsx).
   let myBill: { mySubtotal: number; myAmount: number; itemsSubtotal: number; grandTotal: number } | null = null;
   if (order.status === "closed") {
-    const allSelections = await prisma.foodOrderSelection.findMany({
-      where: { orderId: order.id },
-      include: { menuItem: true },
-    });
-    const lineTotal = (s: (typeof allSelections)[number]) => {
+    const lineTotal = (s: (typeof order.selections)[number]) => {
       const base = s.menuItem.discountedPrice ?? s.menuItem.originalPrice;
       const opts = (s.selectedOptions as { price: number }[] | null) ?? [];
       const addOns = opts.reduce((a, o) => a + (o.price ?? 0), 0);
       return (base + addOns) * s.quantity;
     };
-    const itemsSubtotal = allSelections.reduce((sum, s) => sum + lineTotal(s), 0);
-    const mySubtotal = allSelections
+    const itemsSubtotal = order.selections.reduce((sum, s) => sum + lineTotal(s), 0);
+    const mySubtotal = order.selections
       .filter((s) => s.userId === userId)
       .reduce((sum, s) => sum + lineTotal(s), 0);
     const grandTotal = itemsSubtotal + order.shippingFee - order.discount;
@@ -67,15 +66,32 @@ export default async function FoodOrderJoinPage({ params }: Props) {
       ...m,
       options: m.options as { group: string; choices: { label: string; price: number }[] }[],
     })),
-    mySelections: order.selections.map((s) => ({
-      ...s,
-      createdAt: s.createdAt.toISOString(),
-      updatedAt: s.updatedAt.toISOString(),
-      menuItem: {
-        ...s.menuItem,
-        options: s.menuItem.options as { group: string; choices: { label: string; price: number }[] }[],
-      },
+    mySelections: order.selections
+      .filter((s) => s.userId === userId)
+      .map((s) => ({
+        ...s,
+        createdAt: s.createdAt.toISOString(),
+        updatedAt: s.updatedAt.toISOString(),
+        menuItem: {
+          ...s.menuItem,
+          options: s.menuItem.options as { group: string; choices: { label: string; price: number }[] }[],
+        },
+        selectedOptions: s.selectedOptions as { group: string; choice: string; price: number }[],
+      })),
+    allSelections: order.selections.map((s) => ({
+      id: s.id,
+      userId: s.userId,
+      user: s.user,
+      menuItemId: s.menuItemId,
+      quantity: s.quantity,
       selectedOptions: s.selectedOptions as { group: string; choice: string; price: number }[],
+      note: s.note,
+      menuItem: {
+        id: s.menuItem.id,
+        name: s.menuItem.name,
+        originalPrice: s.menuItem.originalPrice,
+        discountedPrice: s.menuItem.discountedPrice,
+      },
     })),
   };
 

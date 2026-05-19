@@ -22,6 +22,21 @@ interface MySelection {
   note: string | null;
   menuItem: MenuItem;
 }
+interface MemberSelection {
+  id: string;
+  userId: string;
+  user: { id: string; name: string };
+  menuItemId: string;
+  quantity: number;
+  selectedOptions: { group: string; choice: string; price: number }[];
+  note: string | null;
+  menuItem: {
+    id: string;
+    name: string;
+    originalPrice: number;
+    discountedPrice: number | null;
+  };
+}
 interface Order {
   id: string;
   restaurantName: string;
@@ -35,6 +50,7 @@ interface Order {
   creator: { id: string; name: string };
   menuItems: MenuItem[];
   mySelections: MySelection[];
+  allSelections: MemberSelection[];
 }
 
 interface CartItem {
@@ -120,6 +136,7 @@ interface MyBill {
 
 export default function FoodOrderJoin({
   order,
+  currentUserId,
   shareToken,
   myBill,
 }: {
@@ -238,6 +255,14 @@ export default function FoodOrderJoin({
           <span className="text-sm text-ink-soft">
             Organized by <strong>{order.creator.name}</strong>
           </span>
+          <a
+            href={order.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-lavender-600 hover:underline"
+          >
+            View source ↗
+          </a>
         </div>
       </div>
 
@@ -366,10 +391,11 @@ export default function FoodOrderJoin({
           </div>
         </div>
 
-        {/* Cart */}
+        {/* Cart + Members' submissions */}
+        <div className="space-y-6">
         <div>
           <h2 className="text-base font-semibold text-ink mb-3">Your Order</h2>
-          <div className="bg-surface border border-border rounded-xl p-4 sticky top-4">
+          <div className="bg-surface border border-border rounded-xl p-4">
             {cart.length === 0 ? (
               <p className="text-sm text-ink-soft text-center py-4">No items selected</p>
             ) : (
@@ -413,6 +439,71 @@ export default function FoodOrderJoin({
               </button>
             )}
           </div>
+        </div>
+
+      {/* Other members' submissions */}
+      {(() => {
+        const byUser: Record<string, { userName: string; isMe: boolean; items: MemberSelection[] }> = {};
+        for (const sel of order.allSelections) {
+          if (!byUser[sel.userId]) {
+            byUser[sel.userId] = {
+              userName: sel.user.name,
+              isMe: sel.userId === currentUserId,
+              items: [],
+            };
+          }
+          byUser[sel.userId].items.push(sel);
+        }
+        const groups = Object.entries(byUser);
+        if (groups.length === 0) return null;
+        return (
+          <div>
+            <h2 className="text-base font-semibold text-ink mb-3">
+              Members&apos; submissions ({groups.length} {groups.length === 1 ? "person" : "people"})
+            </h2>
+            <div className="space-y-3">
+              {groups.map(([uid, { userName, isMe, items }]) => (
+                <div key={uid} className="bg-surface border border-border rounded-xl p-3">
+                  <p className="text-sm font-semibold text-ink mb-2">
+                    {userName}
+                    {isMe && <span className="ml-2 text-xs font-normal text-lavender-600">(you)</span>}
+                  </p>
+                  <div className="space-y-1">
+                    {items.map((sel) => {
+                      const basePrice = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
+                      const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
+                      const lineTotal = (basePrice + addOns) * sel.quantity;
+                      return (
+                        <div key={sel.id} className="flex items-start justify-between text-sm gap-2">
+                          <div className="flex-1 min-w-0">
+                            <span className="text-ink truncate block">
+                              {sel.menuItem.name}
+                              {sel.quantity > 1 && <span className="text-ink-soft"> ×{sel.quantity}</span>}
+                            </span>
+                            {sel.selectedOptions.length > 0 && (
+                              <span className="text-xs text-ink-soft block truncate">
+                                + {sel.selectedOptions.map((o) => o.choice).join(", ")}
+                              </span>
+                            )}
+                            {sel.note && (
+                              <span className="text-xs text-ink-soft block truncate italic">
+                                Note: {sel.note}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-ink-soft shrink-0">
+                            {lineTotal.toLocaleString("vi-VN")}₫
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
         </div>
       </div>
     </div>

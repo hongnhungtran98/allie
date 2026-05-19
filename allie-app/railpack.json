@@ -8,8 +8,12 @@
   "variables": {
     "PUPPETEER_CACHE_DIR": "/app/.cache/puppeteer"
   },
+  "buildAptPackages": [
+    "xvfb"
+  ],
   "deploy": {
     "aptPackages": [
+      "xvfb",
       "fonts-liberation",
       "libnss3",
       "libatk1.0-0",
@@ -24,8 +28,7 @@
       "libxfixes3",
       "libxrandr2",
       "libpango-1.0-0",
-      "libcairo2",
-      "xvfb"
+      "libcairo2"
     ],
     "variables": {
       "PUPPETEER_CACHE_DIR": "/app/.cache/puppeteer"
