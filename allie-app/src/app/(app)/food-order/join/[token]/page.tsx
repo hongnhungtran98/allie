@@ -1,9 +1,27 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import FoodOrderJoin from "./FoodOrderJoin";
 
 type Props = { params: Promise<{ token: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { token } = await params;
+  const order = await prisma.foodOrder.findUnique({
+    where: { shareToken: token },
+    select: { restaurantName: true },
+  });
+  if (!order) return {};
+  const title = `Đặt món ngay - ${order.restaurantName}`;
+  const description = "Cùng tham gia đặt món dễ dàng với Allie • Click để join!";
+  return {
+    title,
+    description,
+    openGraph: { title, description },
+    twitter: { card: "summary", title, description },
+  };
+}
 
 export default async function FoodOrderJoinPage({ params }: Props) {
   const { token } = await params;

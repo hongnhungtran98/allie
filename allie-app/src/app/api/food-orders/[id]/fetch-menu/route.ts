@@ -33,6 +33,9 @@ function parseGrabModifierGroups(
   const result: { group: string; choices: { label: string; price: number }[] }[] = [];
   for (const g of raw) {
     const group = g as Record<string, unknown>;
+    // GrabFood marks disabled groups/choices by omitting `available` (or setting it false).
+    // Present-and-true is the only "enabled" signal.
+    if (group.available !== true) continue;
     const groupName = String(group.name ?? group.label ?? "").trim();
     const rawChoices = (
       group.modifiers ?? group.options ?? group.selections ?? group.items
@@ -41,13 +44,14 @@ function parseGrabModifierGroups(
     const choices = rawChoices
       .map((c) => {
         const ch = c as Record<string, unknown>;
+        if (ch.available !== true) return null;
         const label = String(ch.name ?? ch.label ?? "").trim();
         const price = Number(
           ch.priceInMinorUnit ?? ch.price ?? ch.priceModifier ?? ch.additionalPrice ?? 0
         );
         return { label, price };
       })
-      .filter((c) => c.label);
+      .filter((c): c is { label: string; price: number } => c !== null && c.label !== "");
     if (choices.length > 0) result.push({ group: groupName, choices });
   }
   return result;
@@ -79,6 +83,10 @@ function parseGrabApiJson(
 
     for (const raw of catItems) {
       const item = raw as Record<string, unknown>;
+      // Skip items GrabFood has disabled (out-of-stock / hidden). Disabled items
+      // omit `available` entirely on the foodweb API, so present-and-true is the
+      // only "enabled" signal.
+      if (item.available !== true) continue;
       const name = String(item.name ?? "").trim();
       if (!name) continue;
 
@@ -287,6 +295,7 @@ function parseShopeeFoodOptions(
   const result: { group: string; choices: { label: string; price: number }[] }[] = [];
   for (const g of raw) {
     const group = g as Record<string, unknown>;
+    if (group.is_deleted === true || group.is_active === false) continue;
     const groupName = String(group.name ?? group.ntop ?? "").trim();
     const optionItems = group.option_items as Record<string, unknown> | undefined;
     const items = optionItems?.items as unknown[] | undefined;
@@ -294,12 +303,13 @@ function parseShopeeFoodOptions(
     const choices = items
       .map((it) => {
         const item = it as Record<string, unknown>;
+        if (item.is_deleted === true || item.is_active === false) return null;
         const label = String(item.name ?? "").trim();
         const priceObj = item.price as Record<string, unknown> | undefined;
         const price = Number(priceObj?.value ?? 0);
         return { label, price };
       })
-      .filter((c) => c.label);
+      .filter((c): c is { label: string; price: number } => c !== null && c.label !== "");
     if (choices.length > 0) result.push({ group: groupName, choices });
   }
   return result;
