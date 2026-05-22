@@ -14,7 +14,15 @@ export async function GET(_req: Request, { params }: Params) {
     where: { shareToken: token },
     include: {
       creator: { select: { id: true, name: true } },
-      menuItems: { where: { isAvailable: true }, orderBy: { name: "asc" } },
+      menuItems: {
+        where: { isAvailable: true },
+        orderBy: [
+          { categorySortOrder: "asc" },
+          { category: "asc" },
+          { itemSortOrder: "asc" },
+          { name: "asc" },
+        ],
+      },
       selections: {
         where: { userId: session.user.id },
         include: { menuItem: true },

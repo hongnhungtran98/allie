@@ -41,6 +41,7 @@ Không bao gồm:
 
 * Tạo tài khoản cho nhân sự mới (add user, set password)
 * Quản lý danh sách món mặc định trong Random Tool
+* Quản lý **danh mục quán cố định** dùng cho Group Food Order: thêm/sửa/xóa quán, thêm/sửa/xóa món của quán, upload ảnh món, cấu hình option của từng món (xem §4.9)
 
 ### 3.2. User (nhân sự)
 
@@ -287,15 +288,24 @@ _Không yêu cầu: xóa từng notification, phân loại theo category._
 
 ### Mô tả
 
-Cho phép một user tạo phiên đặt đồ ăn nhóm: paste link ShopeeFood hoặc Grab → lấy menu → gửi link cho đồng nghiệp vào chọn → tổng hợp đơn và chia bill nếu cần.
+Cho phép một user tạo phiên đặt đồ ăn nhóm. Nguồn menu có thể đến từ một trong hai cách: paste link ShopeeFood/Grab, hoặc chọn quán từ **danh mục quán cố định** do Admin quản lý. Sau khi có menu, host gửi link cho đồng nghiệp vào chọn → tổng hợp đơn và chia bill nếu cần.
+
+### Danh mục quán cố định (Admin quản lý)
+
+* Chỉ **Admin** mới có quyền tạo/sửa/xóa quán và món trong danh mục cố định
+* Mỗi quán có: tên quán, ảnh đại diện (optional), trạng thái active/inactive
+* Mỗi món thuộc quán có: tên món, ảnh món, giá gốc, giá sau giảm (optional), danh sách option group (giống cấu trúc option của menu fetch từ ShopeeFood/Grab), trạng thái available
+* **Ảnh quán và ảnh món lưu trên Supabase Storage**; DB chỉ lưu URL
+* Danh mục dùng chung cho mọi user khi tạo phiên đặt món
 
 ### Luồng chính
 
-1. User tạo phiên đặt món, nhập link ShopeeFood hoặc Grab của quán
-2. Hệ thống fetch menu: danh sách món + option của từng món; **loại bỏ các món đã disabled** trên nguồn
-3. Hệ thống sinh **share link** (dạng token) để gửi cho người khác vào chọn
-4. Mỗi người truy cập share link → **đăng nhập** → chọn tối đa **3 món**, chọn option (nếu có)
-5. Khi phiên đóng (hết countdown hoặc creator bấm đóng), hệ thống tổng hợp đơn
+1. User tạo phiên đặt món, chọn **nguồn menu**:
+   * **Link ngoài:** paste link ShopeeFood hoặc Grab → hệ thống fetch menu, **loại bỏ món đã disabled** trên nguồn
+   * **Quán cố định:** chọn một quán từ danh mục Admin đã tạo → lấy danh sách món `is_available = true` của quán đó
+2. Hệ thống sinh **share link** (dạng token) để gửi cho người khác vào chọn
+3. Mỗi người truy cập share link → **đăng nhập** → chọn tối đa **3 món**, chọn option (nếu có)
+4. Khi phiên đóng (hết countdown hoặc creator bấm đóng), hệ thống tổng hợp đơn
 
 ### Tùy chọn khi tạo phiên
 
@@ -414,11 +424,33 @@ Creator có thể xem lại các phiên đã tạo (danh sách theo thời gian,
 * name
 * created_at, created_by, updated_at, updated_by (VegaBase audit fields)
 
+### Restaurant (quán cố định, Admin tạo)
+
+* id
+* name
+* image_url (nullable — ảnh đại diện, lưu trên Supabase Storage)
+* is_active (boolean, default `true` — quán inactive sẽ không xuất hiện khi host chọn nguồn)
+* created_at, created_by, updated_at, updated_by (VegaBase audit fields)
+
+### RestaurantMenuItem (món thuộc quán cố định)
+
+* id
+* restaurant_id (FK → Restaurant)
+* name
+* image_url (nullable — lưu trên Supabase Storage)
+* original_price (integer)
+* discounted_price (nullable integer)
+* options (JSON — cùng cấu trúc với `FoodMenuItem.options`)
+* is_available (boolean, default `true`)
+* created_at, created_by, updated_at, updated_by (VegaBase audit fields)
+
 ### FoodOrder
 
 * id
 * creator_id (FK → User)
-* source_url (link ShopeeFood / Grab)
+* source_type (`external_link` / `restaurant`)
+* source_url (nullable — link ShopeeFood / Grab; chỉ có khi `source_type = external_link`)
+* restaurant_id (nullable FK → Restaurant; chỉ có khi `source_type = restaurant`)
 * status (`open` / `closed`)
 * countdown_end (nullable datetime — null = không giới hạn thời gian)
 * payment_mode (`orderer_pays` / `split`)

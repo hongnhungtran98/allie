@@ -13,6 +13,7 @@ interface MenuItem {
   originalPrice: number;
   discountedPrice: number | null;
   options: OptionGroup[];
+  category: string | null;
 }
 interface MySelection {
   id: string;
@@ -58,6 +59,20 @@ interface CartItem {
   quantity: number;
   selectedOptions: { group: string; choice: string; price: number }[];
   note: string;
+}
+
+// Group items into contiguous category sections, preserving the API's order.
+// Same item appearing in multiple categories (Grab does this) shows in each.
+function groupByCategory(
+  items: MenuItem[]
+): { category: string | null; items: MenuItem[] }[] {
+  const groups: { category: string | null; items: MenuItem[] }[] = [];
+  for (const item of items) {
+    const last = groups[groups.length - 1];
+    if (last && last.category === item.category) last.items.push(item);
+    else groups.push({ category: item.category, items: [item] });
+  }
+  return groups;
 }
 
 function Countdown({ end }: { end: string }) {
@@ -293,15 +308,22 @@ export default function FoodOrderJoin({
           <h2 className="text-base font-semibold text-ink mb-3">
             Menu — select up to {MAX_ITEMS} items
           </h2>
-          <div className="space-y-3">
-            {order.menuItems.map((item) => {
-              const qty = cartQty(item.id);
-              const inCart = cart.find((c) => c.menuItemId === item.id);
-              const isExpanded = expandedItem === item.id;
+          <div className="space-y-5">
+            {groupByCategory(order.menuItems).map(({ category, items }) => (
+              <div key={category ?? "_uncategorized"} className="space-y-3">
+                {category && (
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft px-1">
+                    {category}
+                  </h3>
+                )}
+                {items.map((item) => {
+                  const qty = cartQty(item.id);
+                  const inCart = cart.find((c) => c.menuItemId === item.id);
+                  const isExpanded = expandedItem === item.id;
 
-              return (
+                  return (
                 <div
-                  key={item.id}
+                  key={`${category ?? ""}-${item.id}`}
                   className={`bg-surface border rounded-xl p-4 transition-colors ${
                     qty > 0 ? "border-lavender-300" : "border-border"
                   }`}
@@ -396,8 +418,10 @@ export default function FoodOrderJoin({
                     </div>
                   )}
                 </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
 

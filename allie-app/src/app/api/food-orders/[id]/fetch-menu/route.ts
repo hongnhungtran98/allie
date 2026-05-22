@@ -17,6 +17,9 @@ interface RawItem {
   originalPrice: number;
   discountedPrice: number | null;
   options: { group: string; choices: { label: string; price: number }[] }[];
+  category: string | null;
+  categorySortOrder: number;
+  itemSortOrder: number;
 }
 
 function parseVnPrice(text: string): number {
@@ -76,23 +79,41 @@ function parseGrabApiJson(
   if (!Array.isArray(categories) || categories.length === 0) return null;
 
   const items: RawItem[] = [];
-  for (const cat of categories) {
+  // Keep GrabFood's category structure (same as on the Grab page). A dish may
+  // appear in multiple categories; we preserve each occurrence so the UI can
+  // group items the same way Grab does.
+  const catNameLog: string[] = [];
+  categories.forEach((cat, catIdx) => {
     const c = cat as Record<string, unknown>;
     const catItems = c.items as unknown[] | undefined;
-    if (!Array.isArray(catItems)) continue;
+    if (!Array.isArray(catItems)) return;
+    // GrabFood's primary field is `name`; allow common alternates defensively in
+    // case a section (e.g. "Recommended") uses a translation map or different key.
+    const customisedName = (() => {
+      const cd = c.CustomisedData as Record<string, unknown> | undefined;
+      const nameField = cd?.Name as Record<string, unknown> | undefined;
+      const value = nameField?.Value as Record<string, string> | undefined;
+      return value?.vi ?? value?.en;
+    })();
+    const categoryName =
+      String(
+        c.name ?? c.categoryName ?? c.label ?? c.title ?? customisedName ?? ""
+      ).trim() || null;
+    const categorySortOrder = Number(c.sortOrder ?? c.sequence ?? catIdx);
+    catNameLog.push(`${categoryName ?? "(none)"}[${catItems.length}]`);
 
-    for (const raw of catItems) {
+    catItems.forEach((raw, itemIdx) => {
       const item = raw as Record<string, unknown>;
       // Skip items GrabFood has disabled (out-of-stock / hidden). Disabled items
       // omit `available` entirely on the foodweb API, so present-and-true is the
       // only "enabled" signal.
-      if (item.available !== true) continue;
+      if (item.available !== true) return;
       const name = String(item.name ?? "").trim();
-      if (!name) continue;
+      if (!name) return;
 
       // GrabFood uses priceInMinorUnit (VND, already in full units for VN)
       const originalPrice = Number(item.priceInMinorUnit ?? item.price ?? 0);
-      if (!originalPrice) continue;
+      if (!originalPrice) return;
 
       const imageUrl = (item.imgHref as string | undefined) ?? null;
 
@@ -101,10 +122,23 @@ function parseGrabApiJson(
         discountedRaw > 0 && discountedRaw !== originalPrice ? discountedRaw : null;
 
       const options = parseGrabModifierGroups(item.modifierGroups ?? []);
+      const itemSortOrder = Number(item.sortOrder ?? itemIdx);
 
-      items.push({ name, imageUrl, originalPrice, discountedPrice, options });
-    }
-  }
+      items.push({
+        name,
+        imageUrl,
+        originalPrice,
+        discountedPrice,
+        options,
+        category: categoryName,
+        categorySortOrder,
+        itemSortOrder,
+      });
+    });
+  });
+
+  // Diagnostic: show what category labels we got (helps catch silent name-field changes)
+  console.log("[GrabFood] categories:", catNameLog.join(" | "));
 
   return items.length > 0 ? { restaurantName, items } : null;
 }
@@ -255,7 +289,7 @@ async function fetchGrabMenu(
 
     const items: RawItem[] = result.items
       .filter((i) => i.name)
-      .map((i) => {
+      .map((i, idx): RawItem | null => {
         const hasDiscount =
           i.originalPriceText !== "" && i.discountedPriceText !== "";
         const originalPrice = hasDiscount
@@ -275,7 +309,10 @@ async function fetchGrabMenu(
             discountedPrice !== null && discountedPrice !== originalPrice
               ? discountedPrice
               : null,
-          options: [] as RawItem["options"],
+          options: [],
+          category: null,
+          categorySortOrder: 0,
+          itemSortOrder: idx,
         };
       })
       .filter((i): i is RawItem => i !== null);
@@ -325,18 +362,22 @@ function parseShopeeFoodDishesPayload(data: unknown): RawItem[] | null {
   if (!Array.isArray(menuInfos)) return null;
 
   const items: RawItem[] = [];
-  for (const cat of menuInfos) {
-    const dishes = (cat as Record<string, unknown>).dishes as unknown[] | undefined;
-    if (!Array.isArray(dishes)) continue;
-    for (const dish of dishes) {
+  menuInfos.forEach((cat, catIdx) => {
+    const catObj = cat as Record<string, unknown>;
+    const dishes = catObj.dishes as unknown[] | undefined;
+    if (!Array.isArray(dishes)) return;
+    const categoryName =
+      String(catObj.dish_type_name ?? catObj.name ?? "").trim() || null;
+    const categorySortOrder = Number(catObj.dish_type_id ?? catIdx);
+    dishes.forEach((dish, itemIdx) => {
       const f = dish as Record<string, unknown>;
-      if (f.is_deleted === true || f.is_active === false) continue;
+      if (f.is_deleted === true || f.is_active === false) return;
       const name = String(f.name ?? "").trim();
-      if (!name) continue;
+      if (!name) return;
 
       const priceObj = f.price as Record<string, unknown> | undefined;
       const originalPrice = Number(priceObj?.value ?? 0);
-      if (!originalPrice) continue;
+      if (!originalPrice) return;
 
       // Prefer a mid-size photo (~400px) for nicer UI thumbnails; fall back to first available
       const photos = f.photos as { width?: number; value?: string }[] | undefined;
@@ -349,9 +390,18 @@ function parseShopeeFoodDishesPayload(data: unknown): RawItem[] | null {
 
       const options = parseShopeeFoodOptions(f.options ?? []);
 
-      items.push({ name, imageUrl, originalPrice, discountedPrice, options });
-    }
-  }
+      items.push({
+        name,
+        imageUrl,
+        originalPrice,
+        discountedPrice,
+        options,
+        category: categoryName,
+        categorySortOrder,
+        itemSortOrder: Number(f.display_order ?? itemIdx),
+      });
+    });
+  });
   return items.length > 0 ? items : null;
 }
 
@@ -473,11 +523,12 @@ async function fetchShopeeFoodMenu(
   }
 }
 
-export async function POST(_req: Request, { params }: Params) {
+export async function POST(req: Request, { params }: Params) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+  const force = new URL(req.url).searchParams.get("force") === "true";
   const order = await prisma.foodOrder.findUnique({
     where: { id },
     include: { _count: { select: { menuItems: true } } },
@@ -488,7 +539,11 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   if (order._count.menuItems > 0) {
-    return NextResponse.json({ restaurantName: order.restaurantName, alreadyFetched: true });
+    if (!force) {
+      return NextResponse.json({ restaurantName: order.restaurantName, alreadyFetched: true });
+    }
+    // Re-fetch: wipe existing menu items. Selections cascade-delete via FK.
+    await prisma.foodMenuItem.deleteMany({ where: { orderId: id } });
   }
 
   const sourceUrl = order.sourceUrl.toLowerCase();
@@ -536,6 +591,9 @@ export async function POST(_req: Request, { params }: Params) {
           discountedPrice: item.discountedPrice ?? null,
           options: item.options as object,
           isAvailable: true,
+          category: item.category,
+          categorySortOrder: item.categorySortOrder,
+          itemSortOrder: item.itemSortOrder,
         })),
       }),
     ]);

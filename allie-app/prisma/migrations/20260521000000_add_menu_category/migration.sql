@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "FoodMenuItem" ADD COLUMN "category" TEXT;
+ALTER TABLE "FoodMenuItem" ADD COLUMN "categorySortOrder" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "FoodMenuItem" ADD COLUMN "itemSortOrder" INTEGER NOT NULL DEFAULT 0;

@@ -141,14 +141,17 @@ model FoodOrder {
 }
 
 model FoodMenuItem {
-  id              String   @id @default(cuid())
-  orderId         String
-  name            String
-  imageUrl        String?
-  originalPrice   Int
-  discountedPrice Int?
-  options         Json     @default("[]")
-  isAvailable     Boolean  @default(true)
+  id                String   @id @default(cuid())
+  orderId           String
+  name              String
+  imageUrl          String?
+  originalPrice     Int
+  discountedPrice   Int?
+  options           Json     @default("[]")
+  isAvailable       Boolean  @default(true)
+  category          String?
+  categorySortOrder Int      @default(0)
+  itemSortOrder     Int      @default(0)
 
   order      FoodOrder            @relation(fields: [orderId], references: [id], onDelete: Cascade)
   selections FoodOrderSelection[]

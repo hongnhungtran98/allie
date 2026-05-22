@@ -17,6 +17,7 @@ interface MenuItem {
   discountedPrice: number | null;
   options: OptionGroup[];
   isAvailable: boolean;
+  category: string | null;
 }
 interface SelectionItem {
   id: string;
@@ -59,6 +60,18 @@ interface BillResult {
   discount: number;
   participants: BillParticipant[];
   splitResult?: { name: string; amount: number }[];
+}
+
+function groupByCategory(
+  items: MenuItem[]
+): { category: string | null; items: MenuItem[] }[] {
+  const groups: { category: string | null; items: MenuItem[] }[] = [];
+  for (const item of items) {
+    const last = groups[groups.length - 1];
+    if (last && last.category === item.category) last.items.push(item);
+    else groups.push({ category: item.category, items: [item] });
+  }
+  return groups;
 }
 
 function Countdown({ end }: { end: string }) {
@@ -107,6 +120,32 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
   const [savingPrice, setSavingPrice] = useState(false);
 
   const isOrderer = order.creator.id === currentUserId;
+
+  const [refetchingMenu, setRefetchingMenu] = useState(false);
+  async function refetchMenu() {
+    if (refetchingMenu) return;
+    const ok = window.confirm(
+      "Tải lại menu sẽ xóa các món hiện có. Các lựa chọn đã đặt cũng sẽ bị xóa theo. Tiếp tục?"
+    );
+    if (!ok) return;
+    setRefetchingMenu(true);
+    try {
+      const res = await fetch(`/api/food-orders/${order.id}/fetch-menu?force=true`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast("error", data.error ?? "Failed to refetch menu");
+        return;
+      }
+      toast("success", `Menu refreshed: ${data.itemCount ?? 0} items`);
+      router.refresh();
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "Failed to refetch menu");
+    } finally {
+      setRefetchingMenu(false);
+    }
+  }
 
   async function toggleOrdered(selectionId: string) {
     const next = !orderedMap[selectionId];
@@ -515,15 +554,26 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
             <h2 className="text-base font-semibold text-ink">
               Menu ({order.menuItems.length} items)
             </h2>
-            {order.menuItems.length > 0 && (
-              <button
-                onClick={() => setMenuExpanded((v) => !v)}
-                className="text-xs font-medium text-lavender-600 hover:underline"
-                aria-expanded={menuExpanded}
-              >
-                {menuExpanded ? "Collapse ▲" : "Expand ▼"}
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {isOrderer && order.menuItems.length > 0 && (
+                <button
+                  onClick={refetchMenu}
+                  disabled={refetchingMenu}
+                  className="text-xs font-medium text-lavender-600 hover:underline disabled:opacity-50"
+                >
+                  {refetchingMenu ? "Refetching…" : "Refetch ↻"}
+                </button>
+              )}
+              {order.menuItems.length > 0 && (
+                <button
+                  onClick={() => setMenuExpanded((v) => !v)}
+                  className="text-xs font-medium text-lavender-600 hover:underline"
+                  aria-expanded={menuExpanded}
+                >
+                  {menuExpanded ? "Collapse ▲" : "Expand ▼"}
+                </button>
+              )}
+            </div>
           </div>
           {order.menuItems.length === 0 ? (
             <div className="bg-surface border border-border rounded-2xl p-8 text-center text-ink-soft text-sm">
@@ -537,9 +587,16 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
               Menu collapsed — click to view {order.menuItems.length} item{order.menuItems.length === 1 ? "" : "s"}
             </button>
           ) : (
-            <div className="space-y-2">
-              {order.menuItems.map((item) => (
-                <div key={item.id} className="bg-surface border border-border rounded-xl p-3 flex gap-3 items-start">
+            <div className="space-y-4">
+              {groupByCategory(order.menuItems).map(({ category, items }) => (
+                <div key={category ?? "_uncategorized"} className="space-y-2">
+                  {category && (
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft px-1">
+                      {category}
+                    </h3>
+                  )}
+                  {items.map((item) => (
+                <div key={`${category ?? ""}-${item.id}`} className="bg-surface border border-border rounded-xl p-3 flex gap-3 items-start">
                   {item.imageUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -574,6 +631,8 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
                       </p>
                     )}
                   </div>
+                </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -613,6 +672,11 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
                             {sel.selectedOptions.length > 0 && (
                               <span className="text-xs text-ink-soft block truncate">
                                 + {sel.selectedOptions.map((o) => o.choice).join(", ")}
+                              </span>
+                            )}
+                            {sel.note && (
+                              <span className="text-xs text-amber-700 italic block break-words">
+                                📝 {sel.note}
                               </span>
                             )}
                             {isOverridden && (
