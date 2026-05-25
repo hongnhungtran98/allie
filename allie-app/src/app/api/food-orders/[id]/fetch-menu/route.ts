@@ -165,14 +165,51 @@ async function fetchGrabMenu(
     // This mirrors the ShopeeFood approach and is far more reliable than DOM scraping for options.
     const pending: Promise<void>[] = [];
     let capturedData: { restaurantName: string; items: RawItem[] } | null = null;
+    let captureResolve: (() => void) | null = null;
+
+    // Block resources that don't contribute to the menu JSON. Grab's menu page pulls
+    // hundreds of lazy-loaded food images plus fonts/CSS/analytics — none of which we
+    // need, since we read the API payload directly. Cuts page load from ~15-25s to ~3-6s.
+    const BLOCKED_RESOURCE_TYPES = new Set([
+      "image",
+      "media",
+      "font",
+      "stylesheet",
+      "texttrack",
+      "manifest",
+    ]);
+    const BLOCKED_HOSTS = [
+      "google-analytics.com",
+      "googletagmanager.com",
+      "doubleclick.net",
+      "facebook.com",
+      "facebook.net",
+      "hotjar.com",
+      "branch.io",
+      "appsflyer.com",
+      "segment.io",
+      "mixpanel.com",
+      "sentry.io",
+    ];
 
     await page.setRequestInterception(true);
-    page.on("request", (req) => req.continue());
+    page.on("request", (req) => {
+      const type = req.resourceType();
+      const reqUrl = req.url();
+      if (BLOCKED_RESOURCE_TYPES.has(type) || BLOCKED_HOSTS.some((h) => reqUrl.includes(h))) {
+        req.abort().catch(() => {});
+        return;
+      }
+      req.continue().catch(() => {});
+    });
 
     page.on("response", (response) => {
       if (capturedData) return;
       const responseUrl = response.url();
-      if (!responseUrl.includes("grab.com") && !responseUrl.includes("grabfood")) return;
+      // Tight filter: only the merchants endpoint carries the full menu payload.
+      // Previously we parsed every JSON response on grab.com — wasteful since each
+      // response.json() materialises the body.
+      if (!responseUrl.includes("/foodweb/guest/v2/merchants/")) return;
       const ct = response.headers()["content-type"] ?? "";
       if (!ct.includes("json")) return;
 
@@ -190,6 +227,7 @@ async function fetchGrabMenu(
               JSON.stringify(parsed.items[0]?.options)
             );
             capturedData = parsed;
+            captureResolve?.();
           } else {
             // Log top-level keys + larger sample to diagnose parser mismatch
             const keys = json && typeof json === "object" ? Object.keys(json as object).join(", ") : "(non-object)";
@@ -201,24 +239,24 @@ async function fetchGrabMenu(
       pending.push(p);
     });
 
-    // domcontentloaded avoids timeout on SPAs that never reach networkidle
+    // commit fires as soon as navigation starts — the menu JSON often arrives before
+    // domcontentloaded, so we don't need to wait for the SPA shell to parse.
     try {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+      await page.goto(url, { waitUntil: "commit", timeout: 30000 });
     } catch {
       // navigation timeout is acceptable; keep waiting for API responses below
     }
 
-    // Poll up to 30 s for the menu API response (same pattern as ShopeeFood)
+    // Wait for menu capture (resolves immediately when set) or 30 s ceiling.
     await new Promise<void>((resolve) => {
-      const start = Date.now();
-      const tick = setInterval(async () => {
-        await Promise.all(pending.splice(0));
-        if (capturedData || Date.now() - start > 30_000) {
-          clearInterval(tick);
-          resolve();
-        }
-      }, 500);
+      captureResolve = resolve;
+      if (capturedData) {
+        resolve();
+        return;
+      }
+      setTimeout(resolve, 30_000);
     });
+    await Promise.all(pending.splice(0));
 
     if (capturedData) return capturedData;
 

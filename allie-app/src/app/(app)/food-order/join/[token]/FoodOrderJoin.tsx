@@ -302,9 +302,9 @@ export default function FoodOrderJoin({
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Menu */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-7">
           <h2 className="text-base font-semibold text-ink mb-3">
             Menu — select up to {MAX_ITEMS} items
           </h2>
@@ -324,7 +324,8 @@ export default function FoodOrderJoin({
                   return (
                 <div
                   key={`${category ?? ""}-${item.id}`}
-                  className={`bg-surface border rounded-xl p-4 transition-colors ${
+                  id={`menu-item-${item.id}`}
+                  className={`bg-surface border rounded-xl p-4 transition-colors scroll-mt-4 ${
                     qty > 0 ? "border-lavender-300" : "border-border"
                   }`}
                 >
@@ -426,7 +427,7 @@ export default function FoodOrderJoin({
         </div>
 
         {/* Cart + Members' submissions */}
-        <div className="space-y-6">
+        <div className="space-y-6 lg:col-span-5">
         <div>
           <h2 className="text-base font-semibold text-ink mb-3">Your Order</h2>
           <div className="bg-surface border border-border rounded-xl p-4">
@@ -443,14 +444,39 @@ export default function FoodOrderJoin({
                   return (
                     <div key={c.menuItemId} className="text-sm">
                       <div className="flex justify-between">
-                        <span className="text-ink flex-1 min-w-0 truncate">{item.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const el = document.getElementById(`menu-item-${item.id}`);
+                            if (el) {
+                              el.scrollIntoView({ behavior: "smooth", block: "start" });
+                              el.classList.add("ring-2", "ring-lavender-400");
+                              window.setTimeout(() => el.classList.remove("ring-2", "ring-lavender-400"), 1500);
+                            }
+                          }}
+                          className="text-ink flex-1 min-w-0 truncate text-left hover:underline cursor-pointer"
+                          title={item.name}
+                        >
+                          {item.name}
+                        </button>
                         <span className="text-ink-soft ml-2 shrink-0">
                           ×{c.quantity} = {lineTotal.toLocaleString("vi-VN")}₫
                         </span>
                       </div>
                       {c.selectedOptions.length > 0 && (
-                        <p className="text-xs text-ink-soft mt-0.5">
+                        <p
+                          className="text-xs text-ink-soft mt-0.5 truncate"
+                          title={c.selectedOptions.map((o) => o.choice).join(", ")}
+                        >
                           {c.selectedOptions.map((o) => o.choice).join(", ")}
+                        </p>
+                      )}
+                      {c.note && (
+                        <p
+                          className="text-xs text-ink-soft mt-0.5 truncate italic"
+                          title={c.note}
+                        >
+                          Note: {c.note}
                         </p>
                       )}
                     </div>
@@ -510,17 +536,23 @@ export default function FoodOrderJoin({
                       return (
                         <div key={sel.id} className="flex items-start justify-between text-sm gap-2">
                           <div className="flex-1 min-w-0">
-                            <span className="text-ink truncate block">
+                            <span className="text-ink truncate block" title={sel.menuItem.name}>
                               {sel.menuItem.name}
                               {sel.quantity > 1 && <span className="text-ink-soft"> ×{sel.quantity}</span>}
                             </span>
                             {sel.selectedOptions.length > 0 && (
-                              <span className="text-xs text-ink-soft block truncate">
+                              <span
+                                className="text-xs text-ink-soft block truncate"
+                                title={sel.selectedOptions.map((o) => o.choice).join(", ")}
+                              >
                                 + {sel.selectedOptions.map((o) => o.choice).join(", ")}
                               </span>
                             )}
                             {sel.note && (
-                              <span className="text-xs text-ink-soft block truncate italic">
+                              <span
+                                className="text-xs text-ink-soft block truncate italic"
+                                title={sel.note}
+                              >
                                 Note: {sel.note}
                               </span>
                             )}
