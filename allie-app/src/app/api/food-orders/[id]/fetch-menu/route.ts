@@ -239,10 +239,10 @@ async function fetchGrabMenu(
       pending.push(p);
     });
 
-    // commit fires as soon as navigation starts — the menu JSON often arrives before
-    // domcontentloaded, so we don't need to wait for the SPA shell to parse.
+    // domcontentloaded is the earliest waitUntil exposed in puppeteer's type defs;
+    // the menu JSON capture below is what actually gates completion.
     try {
-      await page.goto(url, { waitUntil: "commit", timeout: 30000 });
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     } catch {
       // navigation timeout is acceptable; keep waiting for API responses below
     }
