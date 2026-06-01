@@ -124,6 +124,8 @@ model FoodOrder {
   id             String    @id @default(cuid())
   creatorId      String
   sourceUrl      String
+  orderType      String    @default("link")
+  menuImageUrl   String?
   restaurantName String    @default("")
   status         String    @default("open")
   countdownEnd   DateTime?
@@ -161,7 +163,8 @@ model FoodOrderSelection {
   id              String   @id @default(cuid())
   orderId         String
   userId          String
-  menuItemId      String
+  menuItemId      String?
+  customName      String?
   quantity        Int      @default(1)
   selectedOptions Json     @default("[]")
   note            String?
@@ -170,7 +173,7 @@ model FoodOrderSelection {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  order    FoodOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  menuItem FoodMenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  order    FoodOrder     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  menuItem FoodMenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
 }
