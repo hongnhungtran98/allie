@@ -30,12 +30,19 @@ export async function GET(_req: Request, { params }: Params) {
   const byUser: Record<string, { userName: string; items: { name: string; price: number; quantity: number }[]; subtotal: number }> = {};
   for (const sel of order.selections) {
     const uid = sel.userId;
-    const basePrice = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
     const options = (sel.selectedOptions as { price: number }[] | null) ?? [];
     const addOns = options.reduce((a, o) => a + (o.price ?? 0), 0);
-    const unitPrice = sel.priceOverride ?? basePrice + addOns;
+    let basePrice = 0;
+    let name: string;
+    if (sel.menuItem) {
+      basePrice = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
+      name = sel.menuItem.name;
+    } else {
+      name = sel.customName ?? "(chưa đặt tên)";
+    }
+    const unitPrice = sel.priceOverride ?? (sel.menuItem ? basePrice + addOns : 0);
     if (!byUser[uid]) byUser[uid] = { userName: sel.user.name, items: [], subtotal: 0 };
-    byUser[uid].items.push({ name: sel.menuItem.name, price: unitPrice, quantity: sel.quantity });
+    byUser[uid].items.push({ name, price: unitPrice, quantity: sel.quantity });
     byUser[uid].subtotal += unitPrice * sel.quantity;
   }
 

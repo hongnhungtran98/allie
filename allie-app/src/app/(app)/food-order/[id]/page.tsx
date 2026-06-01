@@ -49,10 +49,12 @@ export default async function FoodOrderDetailPage({ params }: Props) {
       ...s,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
-      menuItem: {
-        ...s.menuItem,
-        options: s.menuItem.options as { group: string; choices: { label: string; price: number }[] }[],
-      },
+      menuItem: s.menuItem
+        ? {
+            ...s.menuItem,
+            options: s.menuItem!.options as { group: string; choices: { label: string; price: number }[] }[],
+          }
+        : null,
       selectedOptions: s.selectedOptions as { group: string; choice: string; price: number }[],
     })),
   };

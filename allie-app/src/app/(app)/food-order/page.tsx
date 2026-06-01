@@ -23,10 +23,14 @@ export default async function FoodOrderPage() {
   // Calculate total per order
   const ordersWithTotal = orders.map((o) => {
     const itemTotal = o.selections.reduce((sum, s) => {
+      if (!s.menuItem) {
+        return sum + (s.priceOverride ?? 0) * s.quantity;
+      }
       const basePrice = s.menuItem.discountedPrice ?? s.menuItem.originalPrice;
       const options = (s.selectedOptions as { price: number }[] | null) ?? [];
       const addOns = options.reduce((a, opt) => a + (opt.price ?? 0), 0);
-      return sum + (basePrice + addOns) * s.quantity;
+      const unit = s.priceOverride ?? basePrice + addOns;
+      return sum + unit * s.quantity;
     }, 0);
     const grandTotal = itemTotal + o.shippingFee - o.discount;
     return { ...o, grandTotal };

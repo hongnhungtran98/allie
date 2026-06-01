@@ -55,10 +55,14 @@ export default async function FoodOrderJoinPage({ params }: Props) {
   let myBill: { mySubtotal: number; myAmount: number; itemsSubtotal: number; grandTotal: number } | null = null;
   if (order.status === "closed") {
     const lineTotal = (s: (typeof order.selections)[number]) => {
+      if (!s.menuItem) {
+        return (s.priceOverride ?? 0) * s.quantity;
+      }
       const base = s.menuItem.discountedPrice ?? s.menuItem.originalPrice;
       const opts = (s.selectedOptions as { price: number }[] | null) ?? [];
       const addOns = opts.reduce((a, o) => a + (o.price ?? 0), 0);
-      return (base + addOns) * s.quantity;
+      const unit = s.priceOverride ?? base + addOns;
+      return unit * s.quantity;
     };
     const itemsSubtotal = order.selections.reduce((sum, s) => sum + lineTotal(s), 0);
     const mySubtotal = order.selections
@@ -90,10 +94,12 @@ export default async function FoodOrderJoinPage({ params }: Props) {
         ...s,
         createdAt: s.createdAt.toISOString(),
         updatedAt: s.updatedAt.toISOString(),
-        menuItem: {
-          ...s.menuItem,
-          options: s.menuItem.options as { group: string; choices: { label: string; price: number }[] }[],
-        },
+        menuItem: s.menuItem
+          ? {
+              ...s.menuItem,
+              options: s.menuItem.options as { group: string; choices: { label: string; price: number }[] }[],
+            }
+          : null,
         selectedOptions: s.selectedOptions as { group: string; choice: string; price: number }[],
       })),
     allSelections: order.selections.map((s) => ({
@@ -101,15 +107,19 @@ export default async function FoodOrderJoinPage({ params }: Props) {
       userId: s.userId,
       user: s.user,
       menuItemId: s.menuItemId,
+      customName: s.customName,
       quantity: s.quantity,
+      priceOverride: s.priceOverride,
       selectedOptions: s.selectedOptions as { group: string; choice: string; price: number }[],
       note: s.note,
-      menuItem: {
-        id: s.menuItem.id,
-        name: s.menuItem.name,
-        originalPrice: s.menuItem.originalPrice,
-        discountedPrice: s.menuItem.discountedPrice,
-      },
+      menuItem: s.menuItem
+        ? {
+            id: s.menuItem.id,
+            name: s.menuItem.name,
+            originalPrice: s.menuItem.originalPrice,
+            discountedPrice: s.menuItem.discountedPrice,
+          }
+        : null,
     })),
   };
 

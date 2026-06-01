@@ -5,11 +5,17 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import Link from "next/link";
 
+type OrderType = "link" | "manual";
+
 export default function NewFoodOrderForm() {
   const router = useRouter();
   const toast = useToast();
 
+  const [orderType, setOrderType] = useState<OrderType>("link");
+  const [restaurantName, setRestaurantName] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
+  const [menuFile, setMenuFile] = useState<File | null>(null);
+  const [menuPreview, setMenuPreview] = useState<string | null>(null);
   const [countdownMinutes, setCountdownMinutes] = useState("");
   const [paymentMode, setPaymentMode] = useState<"orderer_pays" | "split">("split");
   const [loading, setLoading] = useState(false);
@@ -28,13 +34,28 @@ export default function NewFoodOrderForm() {
     }
   }
 
+  function onPickFile(f: File | null) {
+    setMenuFile(f);
+    if (menuPreview) URL.revokeObjectURL(menuPreview);
+    setMenuPreview(f ? URL.createObjectURL(f) : null);
+    setErrors((p) => { const n = { ...p }; delete n.menuFile; return n; });
+  }
+
   function validate() {
     const e: Record<string, string> = {};
-    const trimmed = sourceUrl.trim();
-    if (!trimmed) e.sourceUrl = "Source URL is required";
-    else if (!trimmed.startsWith("http")) e.sourceUrl = "Enter a valid URL";
-    else if (!isSupportedFoodUrl(trimmed))
-      e.sourceUrl = "Hiện tại chỉ hỗ trợ link từ GrabFood (food.grab.com, r.grab.com) hoặc ShopeeFood (shopeefood.vn).";
+    if (orderType === "link") {
+      const trimmed = sourceUrl.trim();
+      if (!trimmed) e.sourceUrl = "Source URL is required";
+      else if (!trimmed.startsWith("http")) e.sourceUrl = "Enter a valid URL";
+      else if (!isSupportedFoodUrl(trimmed))
+        e.sourceUrl = "Hiện tại chỉ hỗ trợ link từ GrabFood (food.grab.com, r.grab.com) hoặc ShopeeFood (shopeefood.vn).";
+    } else {
+      if (!menuFile) e.menuFile = "Vui lòng chọn ảnh menu";
+      else if (!["image/jpeg", "image/png", "image/webp"].includes(menuFile.type))
+        e.menuFile = "Chỉ hỗ trợ ảnh JPG, PNG, hoặc WEBP";
+      else if (menuFile.size > 5 * 1024 * 1024)
+        e.menuFile = "Ảnh tối đa 5MB";
+    }
     if (countdownMinutes && parseInt(countdownMinutes) <= 0)
       e.countdownMinutes = "Countdown must be a positive number";
     return e;
@@ -48,12 +69,28 @@ export default function NewFoodOrderForm() {
 
     setLoading(true);
     try {
-      // Create the food order
+      let menuImageUrl: string | null = null;
+
+      if (orderType === "manual" && menuFile) {
+        const fd = new FormData();
+        fd.append("file", menuFile);
+        const upRes = await fetch("/api/food-orders/upload-menu-image", { method: "POST", body: fd });
+        const upData = await upRes.json();
+        if (!upRes.ok) {
+          toast("error", upData.error || "Upload thất bại");
+          return;
+        }
+        menuImageUrl = upData.url;
+      }
+
       const res = await fetch("/api/food-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sourceUrl: sourceUrl.trim(),
+          orderType,
+          restaurantName: restaurantName.trim(),
+          sourceUrl: orderType === "link" ? sourceUrl.trim() : "",
+          menuImageUrl,
           countdownMinutes: countdownMinutes ? parseInt(countdownMinutes) : 0,
           paymentMode,
           shippingFee: 0,
@@ -69,14 +106,16 @@ export default function NewFoodOrderForm() {
 
       const order = await res.json();
 
-      // Fetch menu from the restaurant URL
-      const menuRes = await fetch(`/api/food-orders/${order.id}/fetch-menu`, { method: "POST" });
-      const menuData = await menuRes.json();
-
-      if (menuRes.status === 422 || menuData.error) {
-        toast("warning", menuData.error || "Menu could not be loaded automatically.");
+      if (orderType === "link") {
+        const menuRes = await fetch(`/api/food-orders/${order.id}/fetch-menu`, { method: "POST" });
+        const menuData = await menuRes.json();
+        if (menuRes.status === 422 || menuData.error) {
+          toast("warning", menuData.error || "Menu could not be loaded automatically.");
+        } else {
+          toast("success", `Order session created! ${menuData.itemCount} items loaded.`);
+        }
       } else {
-        toast("success", `Order session created! ${menuData.itemCount} items loaded.`);
+        toast("success", "Đã tạo order với menu ảnh!");
       }
       router.push(`/food-order/${order.id}`);
     } catch {
@@ -88,33 +127,108 @@ export default function NewFoodOrderForm() {
 
   return (
     <form onSubmit={handleSubmit} className="bg-surface border border-border rounded-2xl p-6 space-y-5">
-      {/* Source URL */}
+      {/* Order Type */}
+      <div>
+        <label className="block text-sm font-medium text-ink mb-1.5">Order Type</label>
+        <div className="flex gap-3">
+          {(["link", "manual"] as const).map((t) => (
+            <label
+              key={t}
+              className={`flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors ${
+                orderType === t
+                  ? "border-lavender-500 bg-lavender-50 text-lavender-700"
+                  : "border-border text-ink hover:bg-bg"
+              }`}
+            >
+              <input
+                type="radio"
+                name="orderType"
+                value={t}
+                checked={orderType === t}
+                onChange={() => setOrderType(t)}
+                className="accent-lavender-500"
+              />
+              <span className="text-sm font-medium">
+                {t === "link" ? "Link nhà hàng" : "Upload ảnh menu"}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Restaurant name */}
       <div>
         <label className="block text-sm font-medium text-ink mb-1.5">
-          Restaurant Link <span className="text-red-500">*</span>
+          Tên nhà hàng
+          {orderType === "link" && (
+            <span className="text-ink-soft font-normal"> — optional, tự điền từ link</span>
+          )}
         </label>
         <input
-          type="url"
-          value={sourceUrl}
-          onChange={(e) => setSourceUrl(e.target.value)}
-          onBlur={() => {
-            const trimmed = sourceUrl.trim();
-            if (!trimmed) setErrors((p) => ({ ...p, sourceUrl: "Source URL is required" }));
-            else if (!isSupportedFoodUrl(trimmed))
-              setErrors((p) => ({
-                ...p,
-                sourceUrl:
-                  "Hiện tại chỉ hỗ trợ link từ GrabFood (food.grab.com, r.grab.com) hoặc ShopeeFood (shopeefood.vn).",
-              }));
-            else setErrors((p) => { const n = { ...p }; delete n.sourceUrl; return n; });
-          }}
-          placeholder="https://food.grab.com/... hoặc https://shopeefood.vn/..."
-          className={`w-full px-3 py-2 text-sm border rounded-xl bg-bg focus:outline-none focus:ring-2 focus:ring-lavender-500 ${
-            errors.sourceUrl ? "border-red-400" : "border-border"
-          }`}
+          type="text"
+          value={restaurantName}
+          onChange={(e) => setRestaurantName(e.target.value)}
+          placeholder="Ví dụ: Phở Hà Nội, KFC Lê Lợi..."
+          className="w-full px-3 py-2 text-sm border border-border rounded-xl bg-bg focus:outline-none focus:ring-2 focus:ring-lavender-500"
         />
-        {errors.sourceUrl && <p className="mt-1 text-xs text-red-500">{errors.sourceUrl}</p>}
       </div>
+
+      {/* Source URL */}
+      {orderType === "link" && (
+        <div>
+          <label className="block text-sm font-medium text-ink mb-1.5">
+            Restaurant Link <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="url"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            onBlur={() => {
+              const trimmed = sourceUrl.trim();
+              if (!trimmed) setErrors((p) => ({ ...p, sourceUrl: "Source URL is required" }));
+              else if (!isSupportedFoodUrl(trimmed))
+                setErrors((p) => ({
+                  ...p,
+                  sourceUrl:
+                    "Hiện tại chỉ hỗ trợ link từ GrabFood (food.grab.com, r.grab.com) hoặc ShopeeFood (shopeefood.vn).",
+                }));
+              else setErrors((p) => { const n = { ...p }; delete n.sourceUrl; return n; });
+            }}
+            placeholder="https://food.grab.com/... hoặc https://shopeefood.vn/..."
+            className={`w-full px-3 py-2 text-sm border rounded-xl bg-bg focus:outline-none focus:ring-2 focus:ring-lavender-500 ${
+              errors.sourceUrl ? "border-red-400" : "border-border"
+            }`}
+          />
+          {errors.sourceUrl && <p className="mt-1 text-xs text-red-500">{errors.sourceUrl}</p>}
+        </div>
+      )}
+
+      {/* Menu image */}
+      {orderType === "manual" && (
+        <div>
+          <label className="block text-sm font-medium text-ink mb-1.5">
+            Ảnh menu <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+            className={`block w-full text-sm text-ink file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border file:border-border file:bg-bg file:text-ink hover:file:bg-surface ${
+              errors.menuFile ? "" : ""
+            }`}
+          />
+          {errors.menuFile && <p className="mt-1 text-xs text-red-500">{errors.menuFile}</p>}
+          {menuPreview && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={menuPreview}
+              alt="Menu preview"
+              className="mt-3 max-h-64 rounded-xl border border-border object-contain bg-bg"
+            />
+          )}
+          <p className="mt-1 text-xs text-ink-soft">JPG/PNG/WEBP, tối đa 5MB. Member sẽ nhập tên món tay theo ảnh này.</p>
+        </div>
+      )}
 
       {/* Countdown */}
       <div>

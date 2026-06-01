@@ -22,19 +22,22 @@ interface MenuItem {
 interface SelectionItem {
   id: string;
   userId: string;
-  menuItemId: string;
+  menuItemId: string | null;
+  customName: string | null;
   quantity: number;
   selectedOptions: { group: string; choice: string; price: number }[];
   note: string | null;
   ordered: boolean;
   priceOverride: number | null;
   user: { id: string; name: string; email: string };
-  menuItem: MenuItem;
+  menuItem: MenuItem | null;
 }
 interface Order {
   id: string;
   restaurantName: string;
   sourceUrl: string;
+  orderType: string;
+  menuImageUrl: string | null;
   status: string;
   countdownEnd: string | null;
   paymentMode: string;
@@ -173,10 +176,17 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
     }
   }
   function defaultUnitPrice(sel: SelectionItem) {
+    if (!sel.menuItem) return 0;
     const base = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
     const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
     return base + addOns;
   }
+
+  function selectionName(sel: SelectionItem) {
+    return sel.menuItem?.name ?? sel.customName ?? "(chưa đặt tên)";
+  }
+
+  const isManual = order.orderType === "manual";
 
   function startEditPrice(sel: SelectionItem) {
     const current = priceOverrideMap[sel.id] ?? defaultUnitPrice(sel);
@@ -346,7 +356,7 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
     for (const sel of order.selections) {
       const unitPrice = priceOverrideMap[sel.id] ?? defaultUnitPrice(sel);
       for (let i = 0; i < sel.quantity; i++) {
-        items.push([sel.user.email, unitPrice, sel.menuItem.name]);
+        items.push([sel.user.email, unitPrice, selectionName(sel)]);
       }
     }
     const data = {
@@ -423,14 +433,16 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
                 )}
               </span>
             )}
-            <a
-              href={order.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-lavender-600 hover:underline"
-            >
-              View source ↗
-            </a>
+            {!isManual && order.sourceUrl && (
+              <a
+                href={order.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-lavender-600 hover:underline"
+              >
+                View source ↗
+              </a>
+            )}
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
@@ -548,7 +560,28 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Left column: Menu + Selections */}
         <div className="space-y-6">
-        {/* Menu */}
+        {isManual && order.menuImageUrl ? (
+          <div>
+            <h2 className="text-base font-semibold text-ink mb-3">Ảnh menu</h2>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <a
+              href={order.menuImageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+            >
+              <img
+                src={order.menuImageUrl}
+                alt="Menu"
+                className="w-full max-h-[50vh] object-contain bg-bg border border-border rounded-xl cursor-zoom-in"
+              />
+            </a>
+            <p className="mt-1 text-xs text-ink-soft">
+              Member nhập món tay theo ảnh này. Bạn nhập giá từng món bên dưới.
+            </p>
+          </div>
+        ) : (
+        /* Menu (link mode) */
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-semibold text-ink">
@@ -638,6 +671,7 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
             </div>
           )}
         </div>
+        )}
 
         {/* Selections */}
         <div>
@@ -666,9 +700,14 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
                         <div key={sel.id} className="flex items-start justify-between text-sm gap-2">
                           <div className={`flex-1 min-w-0 ${isOrdered ? "line-through opacity-60" : ""}`}>
                             <span className="text-ink truncate block">
-                              {sel.menuItem.name}
+                              {selectionName(sel)}
                               {sel.quantity > 1 && <span className="text-ink-soft"> ×{sel.quantity}</span>}
                             </span>
+                            {!sel.menuItem && override == null && (
+                              <span className="text-[10px] text-red-500 block">
+                                Chưa nhập giá
+                              </span>
+                            )}
                             {sel.selectedOptions.length > 0 && (
                               <span className="text-xs text-ink-soft block truncate">
                                 + {sel.selectedOptions.map((o) => o.choice).join(", ")}

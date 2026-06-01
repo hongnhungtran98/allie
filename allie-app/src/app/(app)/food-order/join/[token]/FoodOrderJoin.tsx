@@ -17,18 +17,21 @@ interface MenuItem {
 }
 interface MySelection {
   id: string;
-  menuItemId: string;
+  menuItemId: string | null;
+  customName: string | null;
   quantity: number;
   selectedOptions: { group: string; choice: string; price: number }[];
   note: string | null;
-  menuItem: MenuItem;
+  menuItem: MenuItem | null;
 }
 interface MemberSelection {
   id: string;
   userId: string;
   user: { id: string; name: string };
-  menuItemId: string;
+  menuItemId: string | null;
+  customName: string | null;
   quantity: number;
+  priceOverride: number | null;
   selectedOptions: { group: string; choice: string; price: number }[];
   note: string | null;
   menuItem: {
@@ -36,12 +39,14 @@ interface MemberSelection {
     name: string;
     originalPrice: number;
     discountedPrice: number | null;
-  };
+  } | null;
 }
 interface Order {
   id: string;
   restaurantName: string;
   sourceUrl: string;
+  orderType: string;
+  menuImageUrl: string | null;
   status: string;
   countdownEnd: string | null;
   paymentMode: string;
@@ -61,8 +66,12 @@ interface CartItem {
   note: string;
 }
 
-// Group items into contiguous category sections, preserving the API's order.
-// Same item appearing in multiple categories (Grab does this) shows in each.
+interface ManualCartItem {
+  customName: string;
+  quantity: number;
+  note: string;
+}
+
 function groupByCategory(
   items: MenuItem[]
 ): { category: string | null; items: MenuItem[] }[] {
@@ -162,21 +171,38 @@ export default function FoodOrderJoin({
 }) {
   const toast = useToast();
 
-  // Initialize cart from existing selections
+  const isManual = order.orderType === "manual";
+  const MAX_ITEMS = 3;
+  const isOpen = order.status === "open";
+
+  // Cart state for link-mode
   const [cart, setCart] = useState<CartItem[]>(() =>
-    order.mySelections.map((s) => ({
-      menuItemId: s.menuItemId,
-      quantity: s.quantity,
-      selectedOptions: s.selectedOptions,
-      note: s.note ?? "",
-    }))
+    order.mySelections
+      .filter((s) => s.menuItemId)
+      .map((s) => ({
+        menuItemId: s.menuItemId!,
+        quantity: s.quantity,
+        selectedOptions: s.selectedOptions,
+        note: s.note ?? "",
+      }))
   );
+  // Cart state for manual-mode
+  const [manualCart, setManualCart] = useState<ManualCartItem[]>(() =>
+    isManual && order.mySelections.length > 0
+      ? order.mySelections.map((s) => ({
+          customName: s.customName ?? "",
+          quantity: s.quantity,
+          note: s.note ?? "",
+        }))
+      : isManual
+      ? [{ customName: "", quantity: 1, note: "" }]
+      : []
+  );
+
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(order.mySelections.length > 0);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
-
-  const MAX_ITEMS = 3;
-  const isOpen = order.status === "open";
+  const [imgZoom, setImgZoom] = useState(false);
 
   function cartQty(menuItemId: string) {
     return cart.find((c) => c.menuItemId === menuItemId)?.quantity ?? 0;
@@ -188,7 +214,6 @@ export default function FoodOrderJoin({
       return;
     }
     if (cart.some((c) => c.menuItemId === item.id)) {
-      // increment
       setCart((prev) =>
         prev.map((c) => (c.menuItemId === item.id ? { ...c, quantity: c.quantity + 1 } : c))
       );
@@ -221,7 +246,58 @@ export default function FoodOrderJoin({
     setSubmitted(false);
   }
 
+  function updateManual(idx: number, patch: Partial<ManualCartItem>) {
+    setManualCart((prev) => prev.map((m, i) => (i === idx ? { ...m, ...patch } : m)));
+    setSubmitted(false);
+  }
+  function addManualRow() {
+    if (manualCart.length >= MAX_ITEMS) {
+      toast("warning", `You can select at most ${MAX_ITEMS} items`);
+      return;
+    }
+    setManualCart((prev) => [...prev, { customName: "", quantity: 1, note: "" }]);
+    setSubmitted(false);
+  }
+  function removeManualRow(idx: number) {
+    setManualCart((prev) => prev.filter((_, i) => i !== idx));
+    setSubmitted(false);
+  }
+
   async function handleSubmit() {
+    if (isManual) {
+      const items = manualCart
+        .map((m) => ({ ...m, customName: m.customName.trim() }))
+        .filter((m) => m.customName.length > 0);
+      if (items.length === 0) {
+        toast("warning", "Vui lòng nhập ít nhất 1 món");
+        return;
+      }
+      setSubmitting(true);
+      try {
+        const res = await fetch(`/api/food-orders/join/${shareToken}/select`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            selections: items.map((m) => ({
+              customName: m.customName,
+              quantity: Math.max(1, m.quantity || 1),
+              note: m.note,
+            })),
+          }),
+        });
+        if (res.ok) {
+          toast("success", "Đã gửi danh sách món!");
+          setSubmitted(true);
+        } else {
+          const d = await res.json();
+          toast("error", d.error || "Failed to submit");
+        }
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (cart.length === 0) {
       toast("warning", "Please select at least one item");
       return;
@@ -270,14 +346,16 @@ export default function FoodOrderJoin({
           <span className="text-sm text-ink-soft">
             Organized by <strong>{order.creator.name}</strong>
           </span>
-          <a
-            href={order.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-lavender-600 hover:underline"
-          >
-            View source ↗
-          </a>
+          {!isManual && order.sourceUrl && (
+            <a
+              href={order.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-lavender-600 hover:underline"
+            >
+              View source ↗
+            </a>
+          )}
         </div>
       </div>
 
@@ -302,274 +380,393 @@ export default function FoodOrderJoin({
         </div>
       )}
 
+      {/* Manual: menu image */}
+      {isManual && order.menuImageUrl && (
+        <div>
+          <h2 className="text-base font-semibold text-ink mb-2">Ảnh menu</h2>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={order.menuImageUrl}
+            alt="Menu"
+            onClick={() => setImgZoom(true)}
+            className="w-full max-h-[60vh] object-contain bg-bg border border-border rounded-xl cursor-zoom-in"
+          />
+          <p className="mt-1 text-xs text-ink-soft">Click ảnh để xem to. Gõ tên món vào bên dưới.</p>
+        </div>
+      )}
+
+      {isManual && imgZoom && order.menuImageUrl && (
+        <div
+          onClick={() => setImgZoom(false)}
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={order.menuImageUrl} alt="Menu fullsize" className="max-w-full max-h-full object-contain" />
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Menu */}
+        {/* Left: menu or manual form */}
         <div className="lg:col-span-7">
-          <h2 className="text-base font-semibold text-ink mb-3">
-            Menu — select up to {MAX_ITEMS} items
-          </h2>
-          <div className="space-y-5">
-            {groupByCategory(order.menuItems).map(({ category, items }) => (
-              <div key={category ?? "_uncategorized"} className="space-y-3">
-                {category && (
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft px-1">
-                    {category}
-                  </h3>
-                )}
-                {items.map((item) => {
-                  const qty = cartQty(item.id);
-                  const inCart = cart.find((c) => c.menuItemId === item.id);
-                  const isExpanded = expandedItem === item.id;
-
-                  return (
-                <div
-                  key={`${category ?? ""}-${item.id}`}
-                  id={`menu-item-${item.id}`}
-                  className={`bg-surface border rounded-xl p-4 transition-colors scroll-mt-4 ${
-                    qty > 0 ? "border-lavender-300" : "border-border"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    {item.imageUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={item.imageUrl}
-                        alt={item.name}
-                        loading="lazy"
-                        className="w-14 h-14 rounded-lg object-cover shrink-0 bg-bg"
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-ink">{item.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {item.discountedPrice != null ? (
-                          <>
-                            <span className="text-sm font-semibold text-lavender-600">
-                              {item.discountedPrice.toLocaleString("vi-VN")}₫
-                            </span>
-                            <span className="text-xs text-ink-soft line-through">
-                              {item.originalPrice.toLocaleString("vi-VN")}₫
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-sm font-semibold text-ink">
-                            {item.originalPrice.toLocaleString("vi-VN")}₫
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {isOpen && (
-                      <div className="flex items-center gap-2 shrink-0">
-                        {qty > 0 && (
-                          <>
-                            <button
-                              onClick={() => {
-                                if (qty <= 1) removeFromCart(item.id);
-                                else setCart((p) => p.map((c) => c.menuItemId === item.id ? { ...c, quantity: c.quantity - 1 } : c));
-                                setSubmitted(false);
-                              }}
-                              className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-bg text-ink font-bold"
-                            >
-                              −
-                            </button>
-                            <span className="text-sm font-medium w-4 text-center">{qty}</span>
-                          </>
-                        )}
-                        <button
-                          onClick={() => addToCart(item)}
-                          disabled={cart.length >= MAX_ITEMS && qty === 0}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg bg-lavender-500 text-white hover:bg-lavender-600 disabled:opacity-40 font-bold"
-                        >
-                          +
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Options & note (if in cart) */}
-                  {inCart && item.options.length > 0 && (
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => setExpandedItem(isExpanded ? null : item.id)}
-                        className="mt-2 text-xs text-lavender-600 hover:underline"
-                      >
-                        {isExpanded ? "Hide options ▲" : "Customize ▼"}
-                      </button>
-                      {isExpanded && (
-                        <OptionSelector
-                          options={item.options}
-                          selected={inCart.selectedOptions}
-                          onChange={(opts) => updateOptions(item.id, opts)}
-                        />
-                      )}
-                    </div>
-                  )}
-                  {inCart && (
-                    <div className="mt-2">
+          {isManual ? (
+            <>
+              <h2 className="text-base font-semibold text-ink mb-3">
+                Món bạn chọn (tối đa {MAX_ITEMS})
+              </h2>
+              <div className="space-y-3">
+                {manualCart.map((m, idx) => (
+                  <div key={idx} className="bg-surface border border-border rounded-xl p-3 space-y-2">
+                    <div className="flex gap-2">
                       <input
                         type="text"
-                        value={inCart.note}
-                        onChange={(e) => updateNote(item.id, e.target.value)}
-                        placeholder="Note (e.g. no spice)..."
-                        className="w-full px-2 py-1 text-xs border border-border rounded-lg bg-bg focus:outline-none focus:ring-1 focus:ring-lavender-500"
+                        value={m.customName}
+                        onChange={(e) => updateManual(idx, { customName: e.target.value })}
+                        disabled={!isOpen}
+                        placeholder="Tên món (ví dụ: Phở bò)"
+                        className="flex-1 px-3 py-2 text-sm border border-border rounded-xl bg-bg focus:outline-none focus:ring-2 focus:ring-lavender-500"
                       />
-                    </div>
-                  )}
-                </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Cart + Members' submissions */}
-        <div className="space-y-6 lg:col-span-5">
-        <div>
-          <h2 className="text-base font-semibold text-ink mb-3">Your Order</h2>
-          <div className="bg-surface border border-border rounded-xl p-4">
-            {cart.length === 0 ? (
-              <p className="text-sm text-ink-soft text-center py-4">No items selected</p>
-            ) : (
-              <div className="space-y-2">
-                {cart.map((c) => {
-                  const item = order.menuItems.find((m) => m.id === c.menuItemId);
-                  if (!item) return null;
-                  const base = item.discountedPrice ?? item.originalPrice;
-                  const optExtra = c.selectedOptions.reduce((s, o) => s + o.price, 0);
-                  const lineTotal = (base + optExtra) * c.quantity;
-                  return (
-                    <div key={c.menuItemId} className="text-sm">
-                      <div className="flex justify-between">
+                      <input
+                        type="number"
+                        min={1}
+                        value={m.quantity}
+                        onChange={(e) => updateManual(idx, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                        disabled={!isOpen}
+                        className="w-16 px-2 py-2 text-sm border border-border rounded-xl bg-bg text-center focus:outline-none focus:ring-2 focus:ring-lavender-500"
+                      />
+                      {isOpen && manualCart.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => {
-                            const el = document.getElementById(`menu-item-${item.id}`);
-                            if (el) {
-                              el.scrollIntoView({ behavior: "smooth", block: "start" });
-                              el.classList.add("ring-2", "ring-lavender-400");
-                              window.setTimeout(() => el.classList.remove("ring-2", "ring-lavender-400"), 1500);
-                            }
-                          }}
-                          className="text-ink flex-1 min-w-0 truncate text-left hover:underline cursor-pointer"
-                          title={item.name}
+                          onClick={() => removeManualRow(idx)}
+                          className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-ink-soft hover:bg-bg"
+                          title="Remove"
                         >
-                          {item.name}
+                          ×
                         </button>
-                        <span className="text-ink-soft ml-2 shrink-0">
-                          ×{c.quantity} = {lineTotal.toLocaleString("vi-VN")}₫
-                        </span>
-                      </div>
-                      {c.selectedOptions.length > 0 && (
-                        <p
-                          className="text-xs text-ink-soft mt-0.5 truncate"
-                          title={c.selectedOptions.map((o) => o.choice).join(", ")}
-                        >
-                          {c.selectedOptions.map((o) => o.choice).join(", ")}
-                        </p>
-                      )}
-                      {c.note && (
-                        <p
-                          className="text-xs text-ink-soft mt-0.5 truncate italic"
-                          title={c.note}
-                        >
-                          Note: {c.note}
-                        </p>
                       )}
                     </div>
-                  );
-                })}
-                <div className="pt-2 border-t border-border flex justify-between text-sm font-semibold text-ink">
-                  <span>Subtotal</span>
-                  <span>{cartTotal.toLocaleString("vi-VN")}₫</span>
-                </div>
+                    <input
+                      type="text"
+                      value={m.note}
+                      onChange={(e) => updateManual(idx, { note: e.target.value })}
+                      disabled={!isOpen}
+                      placeholder="Ghi chú (không bắt buộc)"
+                      className="w-full px-2 py-1.5 text-xs border border-border rounded-lg bg-bg focus:outline-none focus:ring-1 focus:ring-lavender-500"
+                    />
+                  </div>
+                ))}
+                {isOpen && manualCart.length < MAX_ITEMS && (
+                  <button
+                    type="button"
+                    onClick={addManualRow}
+                    className="w-full py-2 text-sm font-medium text-lavender-600 border border-dashed border-lavender-300 rounded-xl hover:bg-lavender-50"
+                  >
+                    + Thêm món
+                  </button>
+                )}
               </div>
-            )}
+            </>
+          ) : (
+            <>
+              <h2 className="text-base font-semibold text-ink mb-3">
+                Menu — select up to {MAX_ITEMS} items
+              </h2>
+              <div className="space-y-5">
+                {groupByCategory(order.menuItems).map(({ category, items }) => (
+                  <div key={category ?? "_uncategorized"} className="space-y-3">
+                    {category && (
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft px-1">
+                        {category}
+                      </h3>
+                    )}
+                    {items.map((item) => {
+                      const qty = cartQty(item.id);
+                      const inCart = cart.find((c) => c.menuItemId === item.id);
+                      const isExpanded = expandedItem === item.id;
 
-            {isOpen && (
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || cart.length === 0}
-                className="mt-4 w-full py-2 text-sm font-medium text-white bg-lavender-500 hover:bg-lavender-600 disabled:opacity-50 rounded-xl transition-colors"
-              >
-                {submitting ? "Submitting..." : submitted ? "Update Order" : "Submit Order"}
-              </button>
-            )}
-          </div>
-        </div>
-
-      {/* Other members' submissions */}
-      {(() => {
-        const byUser: Record<string, { userName: string; isMe: boolean; items: MemberSelection[] }> = {};
-        for (const sel of order.allSelections) {
-          if (!byUser[sel.userId]) {
-            byUser[sel.userId] = {
-              userName: sel.user.name,
-              isMe: sel.userId === currentUserId,
-              items: [],
-            };
-          }
-          byUser[sel.userId].items.push(sel);
-        }
-        const groups = Object.entries(byUser);
-        if (groups.length === 0) return null;
-        return (
-          <div>
-            <h2 className="text-base font-semibold text-ink mb-3">
-              Members&apos; submissions ({groups.length} {groups.length === 1 ? "person" : "people"})
-            </h2>
-            <div className="space-y-3">
-              {groups.map(([uid, { userName, isMe, items }]) => (
-                <div key={uid} className="bg-surface border border-border rounded-xl p-3">
-                  <p className="text-sm font-semibold text-ink mb-2">
-                    {userName}
-                    {isMe && <span className="ml-2 text-xs font-normal text-lavender-600">(you)</span>}
-                  </p>
-                  <div className="space-y-1">
-                    {items.map((sel) => {
-                      const basePrice = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
-                      const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
-                      const lineTotal = (basePrice + addOns) * sel.quantity;
                       return (
-                        <div key={sel.id} className="flex items-start justify-between text-sm gap-2">
-                          <div className="flex-1 min-w-0">
-                            <span className="text-ink truncate block" title={sel.menuItem.name}>
-                              {sel.menuItem.name}
-                              {sel.quantity > 1 && <span className="text-ink-soft"> ×{sel.quantity}</span>}
-                            </span>
-                            {sel.selectedOptions.length > 0 && (
-                              <span
-                                className="text-xs text-ink-soft block truncate"
-                                title={sel.selectedOptions.map((o) => o.choice).join(", ")}
-                              >
-                                + {sel.selectedOptions.map((o) => o.choice).join(", ")}
-                              </span>
+                        <div
+                          key={`${category ?? ""}-${item.id}`}
+                          id={`menu-item-${item.id}`}
+                          className={`bg-surface border rounded-xl p-4 transition-colors scroll-mt-4 ${
+                            qty > 0 ? "border-lavender-300" : "border-border"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            {item.imageUrl && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={item.imageUrl}
+                                alt={item.name}
+                                loading="lazy"
+                                className="w-14 h-14 rounded-lg object-cover shrink-0 bg-bg"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                              />
                             )}
-                            {sel.note && (
-                              <span
-                                className="text-xs text-ink-soft block truncate italic"
-                                title={sel.note}
-                              >
-                                Note: {sel.note}
-                              </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-ink">{item.name}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {item.discountedPrice != null ? (
+                                  <>
+                                    <span className="text-sm font-semibold text-lavender-600">
+                                      {item.discountedPrice.toLocaleString("vi-VN")}₫
+                                    </span>
+                                    <span className="text-xs text-ink-soft line-through">
+                                      {item.originalPrice.toLocaleString("vi-VN")}₫
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="text-sm font-semibold text-ink">
+                                    {item.originalPrice.toLocaleString("vi-VN")}₫
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {isOpen && (
+                              <div className="flex items-center gap-2 shrink-0">
+                                {qty > 0 && (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        if (qty <= 1) removeFromCart(item.id);
+                                        else setCart((p) => p.map((c) => c.menuItemId === item.id ? { ...c, quantity: c.quantity - 1 } : c));
+                                        setSubmitted(false);
+                                      }}
+                                      className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-bg text-ink font-bold"
+                                    >
+                                      −
+                                    </button>
+                                    <span className="text-sm font-medium w-4 text-center">{qty}</span>
+                                  </>
+                                )}
+                                <button
+                                  onClick={() => addToCart(item)}
+                                  disabled={cart.length >= MAX_ITEMS && qty === 0}
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-lavender-500 text-white hover:bg-lavender-600 disabled:opacity-40 font-bold"
+                                >
+                                  +
+                                </button>
+                              </div>
                             )}
                           </div>
-                          <span className="text-ink-soft shrink-0">
-                            {lineTotal.toLocaleString("vi-VN")}₫
-                          </span>
+
+                          {inCart && item.options.length > 0 && (
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedItem(isExpanded ? null : item.id)}
+                                className="mt-2 text-xs text-lavender-600 hover:underline"
+                              >
+                                {isExpanded ? "Hide options ▲" : "Customize ▼"}
+                              </button>
+                              {isExpanded && (
+                                <OptionSelector
+                                  options={item.options}
+                                  selected={inCart.selectedOptions}
+                                  onChange={(opts) => updateOptions(item.id, opts)}
+                                />
+                              )}
+                            </div>
+                          )}
+                          {inCart && (
+                            <div className="mt-2">
+                              <input
+                                type="text"
+                                value={inCart.note}
+                                onChange={(e) => updateNote(item.id, e.target.value)}
+                                placeholder="Note (e.g. no spice)..."
+                                className="w-full px-2 py-1 text-xs border border-border rounded-lg bg-bg focus:outline-none focus:ring-1 focus:ring-lavender-500"
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Right: cart + members */}
+        <div className="space-y-6 lg:col-span-5">
+          <div>
+            <h2 className="text-base font-semibold text-ink mb-3">Your Order</h2>
+            <div className="bg-surface border border-border rounded-xl p-4">
+              {isManual ? (
+                manualCart.every((m) => !m.customName.trim()) ? (
+                  <p className="text-sm text-ink-soft text-center py-4">Chưa nhập món nào</p>
+                ) : (
+                  <div className="space-y-2">
+                    {manualCart
+                      .filter((m) => m.customName.trim())
+                      .map((m, idx) => (
+                        <div key={idx} className="text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-ink flex-1 min-w-0 truncate" title={m.customName}>
+                              {m.customName}
+                            </span>
+                            <span className="text-ink-soft ml-2 shrink-0">×{m.quantity}</span>
+                          </div>
+                          {m.note && (
+                            <p className="text-xs text-ink-soft mt-0.5 truncate italic" title={m.note}>
+                              Note: {m.note}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    <p className="pt-2 border-t border-border text-xs text-ink-soft italic">
+                      Giá sẽ do host nhập sau khi đóng đơn.
+                    </p>
+                  </div>
+                )
+              ) : cart.length === 0 ? (
+                <p className="text-sm text-ink-soft text-center py-4">No items selected</p>
+              ) : (
+                <div className="space-y-2">
+                  {cart.map((c) => {
+                    const item = order.menuItems.find((m) => m.id === c.menuItemId);
+                    if (!item) return null;
+                    const base = item.discountedPrice ?? item.originalPrice;
+                    const optExtra = c.selectedOptions.reduce((s, o) => s + o.price, 0);
+                    const lineTotal = (base + optExtra) * c.quantity;
+                    return (
+                      <div key={c.menuItemId} className="text-sm">
+                        <div className="flex justify-between">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const el = document.getElementById(`menu-item-${item.id}`);
+                              if (el) {
+                                el.scrollIntoView({ behavior: "smooth", block: "start" });
+                                el.classList.add("ring-2", "ring-lavender-400");
+                                window.setTimeout(() => el.classList.remove("ring-2", "ring-lavender-400"), 1500);
+                              }
+                            }}
+                            className="text-ink flex-1 min-w-0 truncate text-left hover:underline cursor-pointer"
+                            title={item.name}
+                          >
+                            {item.name}
+                          </button>
+                          <span className="text-ink-soft ml-2 shrink-0">
+                            ×{c.quantity} = {lineTotal.toLocaleString("vi-VN")}₫
+                          </span>
+                        </div>
+                        {c.selectedOptions.length > 0 && (
+                          <p
+                            className="text-xs text-ink-soft mt-0.5 truncate"
+                            title={c.selectedOptions.map((o) => o.choice).join(", ")}
+                          >
+                            {c.selectedOptions.map((o) => o.choice).join(", ")}
+                          </p>
+                        )}
+                        {c.note && (
+                          <p
+                            className="text-xs text-ink-soft mt-0.5 truncate italic"
+                            title={c.note}
+                          >
+                            Note: {c.note}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <div className="pt-2 border-t border-border flex justify-between text-sm font-semibold text-ink">
+                    <span>Subtotal</span>
+                    <span>{cartTotal.toLocaleString("vi-VN")}₫</span>
+                  </div>
                 </div>
-              ))}
+              )}
+
+              {isOpen && (
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="mt-4 w-full py-2 text-sm font-medium text-white bg-lavender-500 hover:bg-lavender-600 disabled:opacity-50 rounded-xl transition-colors"
+                >
+                  {submitting ? "Submitting..." : submitted ? "Update Order" : "Submit Order"}
+                </button>
+              )}
             </div>
           </div>
-        );
-      })()}
+
+          {/* Other members' submissions */}
+          {(() => {
+            const byUser: Record<string, { userName: string; isMe: boolean; items: MemberSelection[] }> = {};
+            for (const sel of order.allSelections) {
+              if (!byUser[sel.userId]) {
+                byUser[sel.userId] = {
+                  userName: sel.user.name,
+                  isMe: sel.userId === currentUserId,
+                  items: [],
+                };
+              }
+              byUser[sel.userId].items.push(sel);
+            }
+            const groups = Object.entries(byUser);
+            if (groups.length === 0) return null;
+            return (
+              <div>
+                <h2 className="text-base font-semibold text-ink mb-3">
+                  Members&apos; submissions ({groups.length} {groups.length === 1 ? "person" : "people"})
+                </h2>
+                <div className="space-y-3">
+                  {groups.map(([uid, { userName, isMe, items }]) => (
+                    <div key={uid} className="bg-surface border border-border rounded-xl p-3">
+                      <p className="text-sm font-semibold text-ink mb-2">
+                        {userName}
+                        {isMe && <span className="ml-2 text-xs font-normal text-lavender-600">(you)</span>}
+                      </p>
+                      <div className="space-y-1">
+                        {items.map((sel) => {
+                          const name = sel.menuItem?.name ?? sel.customName ?? "(chưa đặt tên)";
+                          let lineDisplay: string;
+                          if (sel.menuItem) {
+                            const basePrice = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
+                            const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
+                            const unit = sel.priceOverride ?? basePrice + addOns;
+                            lineDisplay = `${(unit * sel.quantity).toLocaleString("vi-VN")}₫`;
+                          } else {
+                            lineDisplay = sel.priceOverride != null
+                              ? `${(sel.priceOverride * sel.quantity).toLocaleString("vi-VN")}₫`
+                              : "Chưa có giá";
+                          }
+                          return (
+                            <div key={sel.id} className="flex items-start justify-between text-sm gap-2">
+                              <div className="flex-1 min-w-0">
+                                <span className="text-ink truncate block" title={name}>
+                                  {name}
+                                  {sel.quantity > 1 && <span className="text-ink-soft"> ×{sel.quantity}</span>}
+                                </span>
+                                {sel.selectedOptions.length > 0 && (
+                                  <span
+                                    className="text-xs text-ink-soft block truncate"
+                                    title={sel.selectedOptions.map((o) => o.choice).join(", ")}
+                                  >
+                                    + {sel.selectedOptions.map((o) => o.choice).join(", ")}
+                                  </span>
+                                )}
+                                {sel.note && (
+                                  <span
+                                    className="text-xs text-ink-soft block truncate italic"
+                                    title={sel.note}
+                                  >
+                                    Note: {sel.note}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-ink-soft shrink-0">{lineDisplay}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
