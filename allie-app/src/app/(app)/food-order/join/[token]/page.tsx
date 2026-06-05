@@ -110,6 +110,7 @@ export default async function FoodOrderJoinPage({ params }: Props) {
       customName: s.customName,
       quantity: s.quantity,
       priceOverride: s.priceOverride,
+      ordered: s.ordered,
       selectedOptions: s.selectedOptions as { group: string; choice: string; price: number }[],
       note: s.note,
       menuItem: s.menuItem

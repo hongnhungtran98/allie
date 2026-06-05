@@ -12,8 +12,8 @@ export async function logoutAction() {
 export async function loginAction(_prev: unknown, formData: FormData) {
   try {
     await signIn("credentials", {
-      email:    formData.get("email"),
-      password: formData.get("password"),
+      identifier: formData.get("identifier"),
+      password:   formData.get("password"),
       redirect: false,
     });
   } catch (e) {

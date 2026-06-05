@@ -20,7 +20,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!target) return NextResponse.json({ error: "Không tìm thấy user" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
-  const data: { name?: string; email?: string; role?: "ADMIN" | "USER"; notificationEnabled?: boolean } = {};
+  const data: { name?: string; email?: string; username?: string | null; role?: "ADMIN" | "USER"; notificationEnabled?: boolean } = {};
 
   if (typeof body?.name === "string") {
     const name = body.name.trim();
@@ -36,6 +36,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (existed) return NextResponse.json({ error: "Email đã tồn tại" }, { status: 409 });
     }
     data.email = email;
+  }
+
+  if ("username" in body) {
+    if (body.username === null || body.username === "") {
+      data.username = null;
+    } else if (typeof body.username === "string") {
+      const username = body.username.trim().toLowerCase();
+      if (!/^[a-z0-9_.-]{3,30}$/.test(username)) {
+        return NextResponse.json({ error: "Username chỉ gồm chữ thường, số, dấu _ . - (3–30 ký tự)" }, { status: 400 });
+      }
+      if (username !== target.username) {
+        const existed = await prisma.user.findUnique({ where: { username } });
+        if (existed) return NextResponse.json({ error: "Username đã tồn tại" }, { status: 409 });
+      }
+      data.username = username;
+    }
   }
 
   if (body?.role === "ADMIN" || body?.role === "USER") {
@@ -55,7 +71,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const updated = await prisma.user.update({
     where: { id },
     data,
-    select: { id: true, name: true, email: true, role: true, notificationEnabled: true, createdAt: true, updatedAt: true },
+    select: { id: true, name: true, email: true, username: true, role: true, notificationEnabled: true, createdAt: true, updatedAt: true },
   });
 
   return NextResponse.json(updated);

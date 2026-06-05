@@ -15,13 +15,14 @@ export default function LoginForm() {
       <form action={formAction} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-ink mb-1.5">
-            Email
+            Email hoặc Username
           </label>
           <input
-            name="email"
+            name="identifier"
             type="text"
-            placeholder="you@company.com"
+            placeholder="you@company.com hoặc username"
             required
+            autoComplete="username"
             className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-bg text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-lavender-500 focus:border-transparent transition"
           />
         </div>

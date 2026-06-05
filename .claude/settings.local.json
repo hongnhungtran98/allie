@@ -14,7 +14,10 @@
       "Bash(curl -s \"https://portal.grab.com/foodweb/v2/merchants/5-C7N1ERAJBCL1AX?latlng=10.762622,106.660172\" -H \"User-Agent: Mozilla/5.0\" -H \"Accept: application/json\")",
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{try{const j=JSON.parse\\(d\\);const cats=j?.merchant?.menu?.categories||[];const first=cats[0]?.items?.[0];console.log\\('cats:',cats.length\\);console.log\\('first item keys:',first?Object.keys\\(first\\).join\\(','\\):'none'\\);console.log\\('imgHref:',first?.imgHref\\);console.log\\('name:',first?.name\\);}catch\\(e\\){console.log\\('parse fail:',d.slice\\(0,300\\)\\);}}\\)\")",
       "Bash(curl -s \"https://portal.grab.com/foodweb/v2/merchants/5-C32HTB6UJNEHLJ?latlng=10.762622,106.660172\" -H \"User-Agent: Mozilla/5.0\" -o /tmp/grab.json)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(pnpm prisma *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Nhung\\\\Allie\\\\allie-app\\\\src\\\\app\\\\\\(app\\)\" -Directory)",
+      "Bash(Select-Object -ExpandProperty Name)"
     ]
   }
 }

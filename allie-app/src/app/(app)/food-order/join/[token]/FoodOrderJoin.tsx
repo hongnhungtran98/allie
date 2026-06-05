@@ -32,6 +32,7 @@ interface MemberSelection {
   customName: string | null;
   quantity: number;
   priceOverride: number | null;
+  ordered: boolean;
   selectedOptions: { group: string; choice: string; price: number }[];
   note: string | null;
   menuItem: {
@@ -735,7 +736,7 @@ export default function FoodOrderJoin({
                           return (
                             <div key={sel.id} className="flex items-start justify-between text-sm gap-2">
                               <div className="flex-1 min-w-0">
-                                <span className="text-ink truncate block" title={name}>
+                                <span className={`truncate block ${sel.ordered ? "line-through text-ink-soft" : "text-ink"}`} title={name}>
                                   {name}
                                   {sel.quantity > 1 && <span className="text-ink-soft"> ×{sel.quantity}</span>}
                                 </span>
@@ -756,7 +757,17 @@ export default function FoodOrderJoin({
                                   </span>
                                 )}
                               </div>
-                              <span className="text-ink-soft shrink-0">{lineDisplay}</span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className={sel.ordered ? "text-ink-soft line-through" : "text-ink-soft"}>{lineDisplay}</span>
+                                {sel.ordered && (
+                                  <span
+                                    title="Đã được host đặt"
+                                    className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-100 text-green-600 text-[11px] font-bold shrink-0"
+                                  >
+                                    ✓
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           );
                         })}

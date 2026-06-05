@@ -9,31 +9,12 @@ export default async function FoodOrderPage() {
   const userId = session!.user.id;
   const isAdmin = session!.user.role === "ADMIN";
 
-  const orders = await prisma.foodOrder.findMany({
+  const ordersWithTotal = await prisma.foodOrder.findMany({
     where: isAdmin ? undefined : { creatorId: userId },
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { selections: true } },
-      selections: {
-        include: { menuItem: true },
-      },
     },
-  });
-
-  // Calculate total per order
-  const ordersWithTotal = orders.map((o) => {
-    const itemTotal = o.selections.reduce((sum, s) => {
-      if (!s.menuItem) {
-        return sum + (s.priceOverride ?? 0) * s.quantity;
-      }
-      const basePrice = s.menuItem.discountedPrice ?? s.menuItem.originalPrice;
-      const options = (s.selectedOptions as { price: number }[] | null) ?? [];
-      const addOns = options.reduce((a, opt) => a + (opt.price ?? 0), 0);
-      const unit = s.priceOverride ?? basePrice + addOns;
-      return sum + unit * s.quantity;
-    }, 0);
-    const grandTotal = itemTotal + o.shippingFee - o.discount;
-    return { ...o, grandTotal };
   });
 
   return (
@@ -60,50 +41,76 @@ export default async function FoodOrderPage() {
           </p>
         </div>
       ) : (
-        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-bg">
-                <th className="text-left px-4 py-3 font-medium text-ink-soft">Restaurant</th>
-                <th className="text-left px-4 py-3 font-medium text-ink-soft">Created</th>
-                <th className="text-left px-4 py-3 font-medium text-ink-soft">Status</th>
-                <th className="text-right px-4 py-3 font-medium text-ink-soft">Orders</th>
-                <th className="text-right px-4 py-3 font-medium text-ink-soft">Total</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {ordersWithTotal.map((o) => (
-                <tr key={o.id} className="border-b border-border last:border-0 hover:bg-bg transition-colors">
-                  <td className="px-4 py-3 font-medium text-ink">
-                    {o.restaurantName || <span className="text-ink-soft italic">Fetching...</span>}
-                  </td>
-                  <td className="px-4 py-3 text-ink-soft">
-                    {new Date(o.createdAt).toLocaleDateString("vi-VN")}
-                  </td>
-                  <td className="px-4 py-3">
-                    <FoodOrderStatusBadge status={o.status} />
-                  </td>
-                  <td className="px-4 py-3 text-right text-ink-soft">
-                    {o._count.selections}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-ink">
-                    {o.grandTotal > 0 ? o.grandTotal.toLocaleString("vi-VN") + "₫" : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
-                    <Link
-                      href={`/food-order/${o.id}`}
-                      className="text-lavender-600 hover:underline text-xs font-medium"
-                    >
-                      View →
-                    </Link>
-                    {isAdmin && <DeleteOrderButton orderId={o.id} />}
-                  </td>
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block bg-surface border border-border rounded-2xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-bg">
+                  <th className="text-left px-4 py-3 font-medium text-ink-soft">Restaurant</th>
+                  <th className="text-left px-4 py-3 font-medium text-ink-soft">Created</th>
+                  <th className="text-left px-4 py-3 font-medium text-ink-soft">Status</th>
+                  <th className="text-right px-4 py-3 font-medium text-ink-soft">Orders</th>
+                  <th className="px-4 py-3" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {ordersWithTotal.map((o) => (
+                  <tr key={o.id} className="border-b border-border last:border-0 hover:bg-bg transition-colors">
+                    <td className="px-4 py-3 font-medium text-ink">
+                      {o.restaurantName || <span className="text-ink-soft italic">Fetching...</span>}
+                    </td>
+                    <td className="px-4 py-3 text-ink-soft">
+                      {new Date(o.createdAt).toLocaleDateString("vi-VN")}
+                    </td>
+                    <td className="px-4 py-3">
+                      <FoodOrderStatusBadge status={o.status} />
+                    </td>
+                    <td className="px-4 py-3 text-right text-ink-soft">
+                      {o._count.selections}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <Link
+                        href={`/food-order/${o.id}`}
+                        className="text-lavender-600 hover:underline text-xs font-medium"
+                      >
+                        View →
+                      </Link>
+                      {isAdmin && <DeleteOrderButton orderId={o.id} />}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {ordersWithTotal.map((o) => (
+              <div key={o.id} className="bg-surface border border-border rounded-2xl p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium text-ink text-sm">
+                    {o.restaurantName || <span className="text-ink-soft italic">Fetching...</span>}
+                  </p>
+                  <FoodOrderStatusBadge status={o.status} />
+                </div>
+                <div className="flex items-center justify-between text-xs text-ink-soft">
+                  <span>{new Date(o.createdAt).toLocaleDateString("vi-VN")}</span>
+                  <span>{o._count.selections} orders</span>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1 border-t border-border">
+                  <Link
+                    href={`/food-order/${o.id}`}
+                    className="text-lavender-600 hover:underline text-xs font-medium"
+                  >
+                    View →
+                  </Link>
+                  {isAdmin && <DeleteOrderButton orderId={o.id} />}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

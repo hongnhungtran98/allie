@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     if (!sourceUrl?.trim())
       return NextResponse.json({ error: "Source URL is required" }, { status: 400 });
   } else {
-    if (!menuImageUrl || typeof menuImageUrl !== "string" || !menuImageUrl.startsWith("/uploads/"))
+    if (!menuImageUrl || typeof menuImageUrl !== "string" || !menuImageUrl.startsWith("/api/food-orders/menu-image/"))
       return NextResponse.json({ error: "Menu image is required" }, { status: 400 });
   }
 

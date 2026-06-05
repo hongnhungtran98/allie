@@ -10,10 +10,22 @@ interface UserItem {
   id: string;
   name: string;
   email: string;
+  username: string | null;
   role: Role;
   notificationEnabled: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+function nameToUsername(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase()
+    .replace(/\s+/g, ".")
+    .replace(/[^a-z0-9._-]/g, "")
+    .slice(0, 30);
 }
 
 function formatTime(iso: string): string {
@@ -110,6 +122,7 @@ export default function UsersClient({ currentUserId }: { currentUserId: string }
             <thead className="bg-lavender-50 text-ink-soft">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Tên</th>
+                <th className="text-left px-4 py-3 font-medium">Username</th>
                 <th className="text-left px-4 py-3 font-medium">Email</th>
                 <th className="text-left px-4 py-3 font-medium">Vai trò</th>
                 <th className="text-left px-4 py-3 font-medium">Tạo lúc</th>
@@ -118,9 +131,9 @@ export default function UsersClient({ currentUserId }: { currentUserId: string }
             </thead>
             <tbody className="divide-y divide-border">
               {loading && items.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-ink-soft">Đang tải…</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-soft">Đang tải…</td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-ink-soft">Không có user nào</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-soft">Không có user nào</td></tr>
               ) : (
                 items.map((u) => (
                   <tr key={u.id} className="hover:bg-lavender-50/40">
@@ -129,6 +142,9 @@ export default function UsersClient({ currentUserId }: { currentUserId: string }
                       {u.id === currentUserId && (
                         <span className="ml-2 text-xs text-lavender-600">(bạn)</span>
                       )}
+                    </td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-ink-soft">
+                      {u.username ?? <span className="italic">—</span>}
                     </td>
                     <td className="px-4 py-2.5 text-ink-soft">{u.email}</td>
                     <td className="px-4 py-2.5">
@@ -230,11 +246,18 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
 function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const toast = useToast();
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [usernameTouched, setUsernameTouched] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("USER");
   const [showPw, setShowPw] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const handleNameChange = (v: string) => {
+    setName(v);
+    if (!usernameTouched) setUsername(nameToUsername(v));
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -242,7 +265,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
     const res = await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password, role }),
+      body: JSON.stringify({ name, email, password, role, username: username.trim() || undefined }),
     });
     setSubmitting(false);
     if (res.ok) {
@@ -260,9 +283,17 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         <Field label="Tên">
           <input
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => handleNameChange(e.target.value)}
             required
             className="w-full px-3 py-2 rounded-xl border border-border bg-surface text-sm text-ink focus:outline-none focus:border-lavender-500"
+          />
+        </Field>
+        <Field label="Username (dùng để đăng nhập)">
+          <input
+            value={username}
+            onChange={(e) => { setUsername(e.target.value); setUsernameTouched(true); }}
+            placeholder="vd: nguyen.van.a"
+            className="w-full px-3 py-2 rounded-xl border border-border bg-surface text-sm text-ink font-mono focus:outline-none focus:border-lavender-500"
           />
         </Field>
         <Field label="Email">
@@ -313,6 +344,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 function EditModal({ user, onClose, onSaved }: { user: UserItem; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
   const [name, setName] = useState(user.name);
+  const [username, setUsername] = useState(user.username ?? nameToUsername(user.name));
   const [email, setEmail] = useState(user.email);
   const [role, setRole] = useState<Role>(user.role);
   const [submitting, setSubmitting] = useState(false);
@@ -323,7 +355,7 @@ function EditModal({ user, onClose, onSaved }: { user: UserItem; onClose: () => 
     const res = await fetch(`/api/admin/users/${user.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, role }),
+      body: JSON.stringify({ name, email, role, username: username.trim() || null }),
     });
     setSubmitting(false);
     if (res.ok) {
@@ -344,6 +376,14 @@ function EditModal({ user, onClose, onSaved }: { user: UserItem; onClose: () => 
             onChange={(e) => setName(e.target.value)}
             required
             className="w-full px-3 py-2 rounded-xl border border-border bg-surface text-sm text-ink focus:outline-none focus:border-lavender-500"
+          />
+        </Field>
+        <Field label="Username (dùng để đăng nhập)">
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="vd: nguyen.van.a"
+            className="w-full px-3 py-2 rounded-xl border border-border bg-surface text-sm text-ink font-mono focus:outline-none focus:border-lavender-500"
           />
         </Field>
         <Field label="Email">

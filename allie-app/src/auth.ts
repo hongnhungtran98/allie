@@ -9,14 +9,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        email:    { label: "Email",    type: "email" },
-        password: { label: "Password", type: "password" },
+        identifier: { label: "Email / Username", type: "text" },
+        password:   { label: "Password",         type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        if (!credentials?.identifier || !credentials?.password) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
+        const id = (credentials.identifier as string).trim().toLowerCase();
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { email: id },
+              { username: id },
+            ],
+          },
         });
         if (!user) return null;
 

@@ -25,9 +25,11 @@ const adminNavItems = [
 interface SidebarProps {
   userName: string;
   userRole: string;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export default function Sidebar({ userName, userRole }: SidebarProps) {
+export default function Sidebar({ userName, userRole, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const initial = userName.charAt(0).toUpperCase();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -50,7 +52,7 @@ export default function Sidebar({ userName, userRole }: SidebarProps) {
   }, [pathname]);
 
   return (
-    <aside className="w-56 shrink-0 bg-lavender-50 flex flex-col h-screen sticky top-0">
+    <aside className={`fixed inset-y-0 left-0 z-50 w-56 shrink-0 bg-lavender-50 flex flex-col h-screen transition-transform duration-300 md:relative md:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}>
       {/* Logo */}
       <div className="px-5 py-6">
         <span className="text-lg font-bold text-lavender-600 tracking-tight">
@@ -68,6 +70,7 @@ export default function Sidebar({ userName, userRole }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                 active
                   ? "bg-lavender-500 text-white"
