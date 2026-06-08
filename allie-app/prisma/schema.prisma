@@ -32,6 +32,12 @@ model User {
   accessLogs         AccessLog[]
 }
 
+model SystemWebhook {
+  id              String @id @default("system")
+  webhookUrl      String
+  messageTemplate String @default("Đã có món ở {tên_quán}, mời mọi người nhận món. Danh sách đặt hàng như sau:\n{danh_sách}")
+}
+
 model AccessLog {
   id        String   @id @default(cuid())
   userId    String

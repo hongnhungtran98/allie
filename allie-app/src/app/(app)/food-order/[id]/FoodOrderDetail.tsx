@@ -242,6 +242,27 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
     }
   }
 
+  const [notifying, setNotifying] = useState(false);
+
+  async function handleNotify() {
+    setNotifying(true);
+    try {
+      const res = await fetch(`/api/food-orders/${order.id}/notify`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 422 && data.error === "no_webhook") {
+        toast("error", data.message ?? "Chưa cấu hình Webhook. Vào Integrations để cài đặt.");
+      } else if (res.ok) {
+        toast("success", "Đã gửi thông báo");
+      } else {
+        toast("error", data.error ?? "Gửi thất bại");
+      }
+    } catch {
+      toast("error", "Gửi thất bại");
+    } finally {
+      setNotifying(false);
+    }
+  }
+
   const [menuExpanded, setMenuExpanded] = useState(false);
   const [countdownEnd, setCountdownEnd] = useState(order.countdownEnd);
   const [extensionCount, setExtensionCount] = useState(order.extensionCount ?? 0);
@@ -464,6 +485,15 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
               className="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 rounded-xl transition-colors"
             >
               Close Session
+            </button>
+          )}
+          {status === "closed" && isOrderer && (
+            <button
+              onClick={handleNotify}
+              disabled={notifying}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-lavender-500 hover:bg-lavender-600 rounded-xl transition-colors disabled:opacity-50"
+            >
+              {notifying ? "Đang gửi..." : "Đã có món 🔔"}
             </button>
           )}
         </div>

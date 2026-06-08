@@ -20,6 +20,7 @@ const navItems = [
 const adminNavItems = [
   { href: "/users",          label: "Users",         icon: "👥" },
   { href: "/access-logs",    label: "Access Log",    icon: "🛡️" },
+  { href: "/integrations",   label: "Integrations",  icon: "🔗" },
 ];
 
 interface SidebarProps {

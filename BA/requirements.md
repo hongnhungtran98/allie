@@ -26,6 +26,7 @@ Phiên bản đầu tiên chỉ bao gồm:
 4. Reminder + Notification Settings
 5. Random tool (ăn gì)
 6. Đặt món (Group Food Order)
+7. Integrations (Webhook)
 
 Không bao gồm:
 
@@ -328,6 +329,21 @@ Mỗi món hiển thị: hình ảnh, tên món, giá gốc, giá sau giảm, da
   * Payload gửi đi: danh sách người mua + số tiền từng món của họ (ship fee, discount gửi kèm để API tự tính)
   * Hiển thị kết quả chia bill cho creator
 
+### Thông báo "Đã có món" (Webhook)
+
+* Khi phiên ở trạng thái `closed`, host thấy nút **"Đã có món"**
+* Nhấn nút → hệ thống gửi POST đến Webhook URL đã cấu hình (xem §4.10) với nội dung tin nhắn theo mẫu đã lưu
+* Nội dung tin nhắn mặc định:
+
+```text
+Đã có món ở [tên_quán], mời mọi người nhận món. Danh sách đặt hàng như sau:
+- [Tên người chọn món]: [tên món]
+- ...
+```
+
+* Nếu chưa cấu hình Webhook URL: nút vẫn hiển thị nhưng khi nhấn hiện thông báo hướng dẫn vào cài đặt
+* Nút chỉ hiển thị với **host (creator)** của phiên
+
 ### Trạng thái phiên
 
 | Trạng thái | Mô tả |
@@ -343,6 +359,33 @@ Creator có thể xem lại các phiên đã tạo (danh sách theo thời gian,
 
 * Tích hợp thanh toán thực (VNPay, Momo…)
 * Sync real-time trạng thái chọn của từng người (polling thủ công là đủ)
+
+---
+
+## 4.10. Integrations
+
+Menu **Integrations** chứa các cài đặt tích hợp bên ngoài. Hiện tại có một màn hình: **Webhook**.
+
+### Webhook Settings
+
+* User nhập và lưu **Webhook URL** (URL nhận POST request từ hệ thống, ví dụ: Google Chat, Slack incoming webhook)
+* User nhập và lưu **nội dung tin nhắn mẫu** (có thể chỉnh sửa nội dung mặc định ở §4.9)
+* Cài đặt Webhook là **per-user** — mỗi user lưu webhook riêng
+* Khi host nhấn "Đã có món" (§4.9), hệ thống render template rồi gửi POST đến URL đã lưu
+
+**Không yêu cầu:** hỗ trợ nhiều webhook cùng lúc; xác thực kết nối webhook (test connection).
+
+### Kỹ thuật gửi Webhook (BE — `dispatchToWebhook`)
+
+* **Giao thức:** HTTP POST thuần (`fetch`) đến URL đã cấu hình
+* **Header:** `Content-Type: application/json`
+* **Body:** `{ "text": "<rendered message>" }` — chỉ một field `text` dạng plain string
+* **Timeout:** 10 giây (`AbortSignal.timeout(10_000)`)
+* **Fire-and-forget:** lỗi chỉ log, không throw — không ảnh hưởng luồng chính
+
+**Render tin nhắn:** template lấy từ DB (hoặc default) với các placeholder `{tên_quán}`, `{tên_người}`, `{tên_món}`. Google Chat incoming webhook cũng nhận `{ text: "..." }` nên backend dùng chung một body format cho mọi loại webhook.
+
+**Phía bên nhận (endpoint ngoài):** nhận POST với JSON body `{ "text": "..." }`, không có auth header, không có signature — bên nhận chỉ cần parse JSON và đọc `text`.
 
 ---
 
@@ -480,6 +523,13 @@ Creator có thể xem lại các phiên đã tạo (danh sách theo thời gian,
 * selected_options (JSON — option đã chọn)
 * note (nullable string)
 * created_at, updated_at
+
+### UserWebhook
+
+* id
+* user_id (FK → User)
+* webhook_url
+* message_template (text — nội dung tin nhắn mẫu với placeholder)
 
 ---
 

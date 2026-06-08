@@ -11,5 +11,7 @@ export default defineConfig({
   },
   datasource: {
     url: process.env["DATABASE_URL"],
+    // For migrations use the session-mode pooler (port 5432), not the transaction pooler (port 6543).
+    // Run: $env:DATABASE_URL = "<pooler-host>:5432/postgres"; npx prisma migrate deploy
   },
 });
