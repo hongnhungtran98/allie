@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import FoodOrderStatusBadge from "../../FoodOrderStatusBadge";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 interface OptionChoice { label: string; price: number }
 interface OptionGroup { group: string; choices: OptionChoice[] }
@@ -54,6 +56,7 @@ interface Order {
   shippingFee: number;
   discount: number;
   shareToken: string;
+  extensionCount: number;
   creator: { id: string; name: string };
   menuItems: MenuItem[];
   mySelections: MySelection[];
@@ -171,10 +174,64 @@ export default function FoodOrderJoin({
   myBill: MyBill | null;
 }) {
   const toast = useToast();
+  const router = useRouter();
 
   const isManual = order.orderType === "manual";
   const MAX_ITEMS = 3;
-  const isOpen = order.status === "open";
+  const MAX_EXTENSIONS = 3;
+  const isCreator = currentUserId === order.creator.id;
+
+  const [status, setStatus] = useState(order.status);
+  const [countdownEnd, setCountdownEnd] = useState(order.countdownEnd);
+  const [extensionCount, setExtensionCount] = useState(order.extensionCount ?? 0);
+  const [extending, setExtending] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [showClose, setShowClose] = useState(false);
+
+  const isOpen = status === "open";
+
+  async function handleExtend() {
+    setExtending(true);
+    try {
+      const res = await fetch(`/api/food-orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "extend" }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setCountdownEnd(updated.countdownEnd);
+        setExtensionCount(updated.extensionCount);
+        toast("success", "Đã gia hạn thêm 10 phút");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast("error", err.error ?? "Không thể gia hạn");
+      }
+    } finally {
+      setExtending(false);
+    }
+  }
+
+  async function handleClose() {
+    setClosing(true);
+    try {
+      const res = await fetch(`/api/food-orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "close" }),
+      });
+      if (res.ok) {
+        setStatus("closed");
+        setShowClose(false);
+        toast("success", "Order session closed");
+        router.refresh();
+      } else {
+        toast("error", "Failed to close session");
+      }
+    } finally {
+      setClosing(false);
+    }
+  }
 
   // Cart state for link-mode
   const [cart, setCart] = useState<CartItem[]>(() =>
@@ -204,6 +261,64 @@ export default function FoodOrderJoin({
   const [submitted, setSubmitted] = useState(order.mySelections.length > 0);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [imgZoom, setImgZoom] = useState(false);
+
+  const [priceOverrideMap, setPriceOverrideMap] = useState<Record<string, number | null>>(() =>
+    Object.fromEntries(order.allSelections.map((s) => [s.id, s.priceOverride ?? null]))
+  );
+  const [editingPrice, setEditingPrice] = useState<string | null>(null);
+  const [priceDraft, setPriceDraft] = useState("");
+  const [savingPrice, setSavingPrice] = useState(false);
+
+  function startEditPrice(selId: string, currentPrice: number | null) {
+    setEditingPrice(selId);
+    setPriceDraft(String(currentPrice ?? ""));
+  }
+
+  async function savePrice(selId: string, quantity: number) {
+    const value = Number(priceDraft);
+    if (!Number.isFinite(value) || value < 0) {
+      toast("error", "Nhập số không âm");
+      return;
+    }
+    setSavingPrice(true);
+    try {
+      const res = await fetch(`/api/food-orders/${order.id}/selections/${selId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: Math.round(value) }),
+      });
+      if (res.ok) {
+        setPriceOverrideMap((m) => ({ ...m, [selId]: Math.round(value) }));
+        setEditingPrice(null);
+        toast("success", "Đã cập nhật giá");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast("error", err.error ?? "Không cập nhật được");
+      }
+    } finally {
+      setSavingPrice(false);
+    }
+  }
+
+  async function resetPrice(selId: string) {
+    setSavingPrice(true);
+    try {
+      const res = await fetch(`/api/food-orders/${order.id}/selections/${selId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null }),
+      });
+      if (res.ok) {
+        setPriceOverrideMap((m) => ({ ...m, [selId]: null }));
+        setEditingPrice(null);
+        toast("success", "Đã xóa giá");
+      } else {
+        toast("error", "Không xóa được");
+      }
+    } finally {
+      setSavingPrice(false);
+    }
+  }
 
   function cartQty(menuItemId: string) {
     return cart.find((c) => c.menuItemId === menuItemId)?.quantity ?? 0;
@@ -333,31 +448,56 @@ export default function FoodOrderJoin({
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-ink">
-          {order.restaurantName || "Food Order"}
-        </h1>
-        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-          <FoodOrderStatusBadge status={order.status} />
-          {isOpen && order.countdownEnd && (
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-ink">
+            {order.restaurantName || "Food Order"}
+          </h1>
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            <FoodOrderStatusBadge status={status} />
+            {isOpen && countdownEnd && (
+              <span className="text-sm text-ink-soft">
+                Closes in <Countdown end={countdownEnd} />
+                {extensionCount > 0 && (
+                  <span className="ml-1 text-xs">
+                    (đã gia hạn {extensionCount}/{MAX_EXTENSIONS})
+                  </span>
+                )}
+              </span>
+            )}
             <span className="text-sm text-ink-soft">
-              Closes in <Countdown end={order.countdownEnd} />
+              Organized by <strong>{order.creator.name}</strong>
             </span>
-          )}
-          <span className="text-sm text-ink-soft">
-            Organized by <strong>{order.creator.name}</strong>
-          </span>
-          {!isManual && order.sourceUrl && (
-            <a
-              href={order.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-lavender-600 hover:underline"
-            >
-              View source ↗
-            </a>
-          )}
+            {!isManual && order.sourceUrl && (
+              <a
+                href={order.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-lavender-600 hover:underline"
+              >
+                View source ↗
+              </a>
+            )}
+          </div>
         </div>
+        {isCreator && isOpen && (
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={handleExtend}
+              disabled={extending || extensionCount >= MAX_EXTENSIONS}
+              title={extensionCount >= MAX_EXTENSIONS ? "Đã đạt giới hạn 3 lần" : "Thêm 10 phút"}
+              className="px-3 py-1.5 text-sm font-medium text-lavender-600 border border-lavender-200 hover:bg-lavender-50 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {extending ? "..." : `+10 phút (${extensionCount}/${MAX_EXTENSIONS})`}
+            </button>
+            <button
+              onClick={() => setShowClose(true)}
+              className="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 rounded-xl transition-colors"
+            >
+              Close Session
+            </button>
+          </div>
+        )}
       </div>
 
       {!isOpen && (
@@ -722,17 +862,20 @@ export default function FoodOrderJoin({
                       <div className="space-y-1">
                         {items.map((sel) => {
                           const name = sel.menuItem?.name ?? sel.customName ?? "(chưa đặt tên)";
+                          const override = priceOverrideMap[sel.id] ?? null;
                           let lineDisplay: string;
                           if (sel.menuItem) {
                             const basePrice = sel.menuItem.discountedPrice ?? sel.menuItem.originalPrice;
                             const addOns = sel.selectedOptions.reduce((a, o) => a + (o.price ?? 0), 0);
-                            const unit = sel.priceOverride ?? basePrice + addOns;
+                            const unit = override ?? basePrice + addOns;
                             lineDisplay = `${(unit * sel.quantity).toLocaleString("vi-VN")}₫`;
                           } else {
-                            lineDisplay = sel.priceOverride != null
-                              ? `${(sel.priceOverride * sel.quantity).toLocaleString("vi-VN")}₫`
+                            lineDisplay = override != null
+                              ? `${(override * sel.quantity).toLocaleString("vi-VN")}₫`
                               : "Chưa có giá";
                           }
+                          const isEditingThis = editingPrice === sel.id;
+                          const canEditPrice = isCreator && !isOpen;
                           return (
                             <div key={sel.id} className="flex items-start justify-between text-sm gap-2">
                               <div className="flex-1 min-w-0">
@@ -756,18 +899,71 @@ export default function FoodOrderJoin({
                                     Note: {sel.note}
                                   </span>
                                 )}
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className={sel.ordered ? "text-ink-soft line-through" : "text-ink-soft"}>{lineDisplay}</span>
-                                {sel.ordered && (
-                                  <span
-                                    title="Đã được host đặt"
-                                    className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-100 text-green-600 text-[11px] font-bold shrink-0"
-                                  >
-                                    ✓
-                                  </span>
+                                {canEditPrice && !sel.menuItem && override == null && (
+                                  <span className="text-[10px] text-red-500 block">Chưa nhập giá</span>
                                 )}
                               </div>
+                              {canEditPrice && isEditingThis ? (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    autoFocus
+                                    value={priceDraft}
+                                    onChange={(e) => setPriceDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") savePrice(sel.id, sel.quantity);
+                                      else if (e.key === "Escape") setEditingPrice(null);
+                                    }}
+                                    disabled={savingPrice}
+                                    className="w-20 px-2 py-1 text-xs border border-border rounded-lg bg-bg text-ink focus:outline-none focus:border-lavender-400"
+                                  />
+                                  <button
+                                    onClick={() => savePrice(sel.id, sel.quantity)}
+                                    disabled={savingPrice}
+                                    className="px-1.5 py-1 text-[10px] font-medium text-white bg-lavender-500 hover:bg-lavender-600 rounded-md disabled:opacity-50"
+                                  >
+                                    {savingPrice ? "..." : "Lưu"}
+                                  </button>
+                                  {override != null && (
+                                    <button
+                                      onClick={() => resetPrice(sel.id)}
+                                      disabled={savingPrice}
+                                      className="px-1.5 py-1 text-[10px] text-ink-soft hover:text-ink"
+                                      title="Xóa giá"
+                                    >
+                                      ↺
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => setEditingPrice(null)}
+                                    disabled={savingPrice}
+                                    className="px-1 py-1 text-[10px] text-ink-soft hover:text-ink"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => canEditPrice && startEditPrice(sel.id, override)}
+                                    disabled={!canEditPrice}
+                                    className={`${sel.ordered ? "text-ink-soft line-through" : override == null && !sel.menuItem ? "text-red-400" : "text-ink-soft"} ${canEditPrice ? "hover:underline cursor-pointer" : "cursor-default"}`}
+                                    title={canEditPrice ? "Click để nhập giá" : undefined}
+                                  >
+                                    {lineDisplay}
+                                  </button>
+                                  {sel.ordered && (
+                                    <span
+                                      title="Đã được host đặt"
+                                      className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-100 text-green-600 text-[11px] font-bold shrink-0"
+                                    >
+                                      ✓
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -780,6 +976,16 @@ export default function FoodOrderJoin({
           })()}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showClose}
+        title="Close Order Session"
+        message="Are you sure you want to close this order session? No more selections can be made after closing."
+        confirmLabel={closing ? "Closing..." : "Close Session"}
+        onConfirm={handleClose}
+        onCancel={() => setShowClose(false)}
+        loading={closing}
+      />
     </div>
   );
 }

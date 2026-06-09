@@ -300,6 +300,7 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
         else setDiscount(Math.round(value));
         setEditingFee(null);
         toast("success", "Updated");
+        if (status === "closed") loadBill();
       } else {
         const err = await res.json().catch(() => ({}));
         toast("error", err.error ?? "Failed to update");
