@@ -5,11 +5,13 @@ import { useToast } from "@/components/ui/Toast";
 
 const DEFAULT_TEMPLATE =
   "Đã có món ở {tên_quán}, mời mọi người nhận món. Danh sách đặt hàng như sau:\n{danh_sách}";
+const DEFAULT_ROW = "- {tên_người}: {tên_món}";
 
 export default function WebhookSettingsForm({ isAdmin }: { isAdmin: boolean }) {
   const toast = useToast();
   const [webhookUrl, setWebhookUrl] = useState("");
   const [messageTemplate, setMessageTemplate] = useState(DEFAULT_TEMPLATE);
+  const [listRowTemplate, setListRowTemplate] = useState(DEFAULT_ROW);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -19,6 +21,7 @@ export default function WebhookSettingsForm({ isAdmin }: { isAdmin: boolean }) {
       .then((data) => {
         setWebhookUrl(data.webhookUrl ?? "");
         setMessageTemplate(data.messageTemplate || DEFAULT_TEMPLATE);
+        setListRowTemplate(data.listRowTemplate || DEFAULT_ROW);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -35,7 +38,7 @@ export default function WebhookSettingsForm({ isAdmin }: { isAdmin: boolean }) {
       const res = await fetch("/api/integrations/webhook", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ webhookUrl, messageTemplate }),
+        body: JSON.stringify({ webhookUrl, messageTemplate, listRowTemplate }),
       });
       if (res.ok) {
         toast("success", "Đã lưu cài đặt Webhook");
@@ -102,6 +105,26 @@ export default function WebhookSettingsForm({ isAdmin }: { isAdmin: boolean }) {
                 — tên quán;{" "}
                 <code className="bg-bg border border-border px-1 rounded text-xs">{"{danh_sách}"}</code>{" "}
                 — danh sách người đặt.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-ink mb-1.5">
+                Định dạng mỗi dòng danh sách
+              </label>
+              <input
+                type="text"
+                value={listRowTemplate}
+                onChange={(e) => setListRowTemplate(e.target.value)}
+                placeholder="- {tên_người}: {tên_món}"
+                className="w-full px-3 py-2 text-sm border border-border rounded-xl bg-bg text-ink font-mono placeholder:text-ink-soft focus:outline-none focus:border-lavender-400"
+              />
+              <p className="text-xs text-ink-soft mt-1">
+                Placeholder:{" "}
+                <code className="bg-bg border border-border px-1 rounded text-xs">{"{tên_người}"}</code>{" "}
+                — tên người đặt;{" "}
+                <code className="bg-bg border border-border px-1 rounded text-xs">{"{tên_món}"}</code>{" "}
+                — tên món.
               </p>
             </div>
 

@@ -45,7 +45,7 @@ export async function POST(_req: Request, { params }: Params) {
     itemName: sel.menuItem?.name ?? sel.customName ?? "(chưa đặt tên)",
   }));
 
-  const text = renderWebhookMessage(webhook.messageTemplate, order.restaurantName, lines);
+  const text = renderWebhookMessage(webhook.messageTemplate, webhook.listRowTemplate, order.restaurantName, lines);
 
   // fire-and-forget — response is returned immediately
   dispatchToWebhook(webhook.webhookUrl, text);
