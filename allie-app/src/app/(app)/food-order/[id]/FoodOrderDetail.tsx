@@ -729,8 +729,8 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
                       const isOverridden = override !== null;
                       return (
                         <div key={sel.id} className="flex items-start justify-between text-sm gap-2">
-                          <div className={`flex-1 min-w-0 ${isOrdered ? "line-through opacity-60" : ""}`}>
-                            <span className="text-ink truncate block">
+                          <div className="flex-1 min-w-0">
+                            <span className="text-ink block break-words">
                               {selectionName(sel)}
                               {sel.quantity > 1 && <span className="text-ink-soft"> ×{sel.quantity}</span>}
                             </span>
@@ -740,9 +740,11 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
                               </span>
                             )}
                             {sel.selectedOptions.length > 0 && (
-                              <span className="text-xs text-ink-soft block truncate">
-                                + {sel.selectedOptions.map((o) => o.choice).join(", ")}
-                              </span>
+                              <div className="text-xs text-ink-soft">
+                                {sel.selectedOptions.map((o, i) => (
+                                  <span key={i} className="block">+ {o.choice}</span>
+                                ))}
+                              </div>
                             )}
                             {sel.note && (
                               <span className="text-xs text-amber-700 italic block break-words">
@@ -800,7 +802,7 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
                               type="button"
                               onClick={() => isOrderer && startEditPrice(sel)}
                               disabled={!isOrderer}
-                              className={`shrink-0 ${isOrdered ? "line-through opacity-60" : ""} ${
+                              className={`shrink-0 ${
                                 isOverridden ? "text-amber-600 font-medium" : "text-ink-soft"
                               } ${isOrderer ? "hover:underline cursor-pointer" : "cursor-default"}`}
                               title={isOrderer ? "Click to edit price" : undefined}

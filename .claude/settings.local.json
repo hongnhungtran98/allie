@@ -17,7 +17,9 @@
       "Read(//tmp/**)",
       "Bash(pnpm prisma *)",
       "Bash(Get-ChildItem -Path \"c:\\\\Nhung\\\\Allie\\\\allie-app\\\\src\\\\app\\\\\\(app\\)\" -Directory)",
-      "Bash(Select-Object -ExpandProperty Name)"
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(Get-ChildItem -Recurse -Path \"c:\\\\Nhung\\\\Allie\\\\allie-app\\\\src\\\\components\" -Filter \"*.tsx\")",
+      "Bash(Select-Object FullName)"
     ]
   }
 }

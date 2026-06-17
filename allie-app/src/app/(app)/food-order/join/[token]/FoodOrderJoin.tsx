@@ -879,23 +879,19 @@ export default function FoodOrderJoin({
                           return (
                             <div key={sel.id} className="flex items-start justify-between text-sm gap-2">
                               <div className="flex-1 min-w-0">
-                                <span className={`truncate block ${sel.ordered ? "line-through text-ink-soft" : "text-ink"}`} title={name}>
+                                <span className="block break-words text-ink">
                                   {name}
                                   {sel.quantity > 1 && <span className="text-ink-soft"> ×{sel.quantity}</span>}
                                 </span>
                                 {sel.selectedOptions.length > 0 && (
-                                  <span
-                                    className="text-xs text-ink-soft block truncate"
-                                    title={sel.selectedOptions.map((o) => o.choice).join(", ")}
-                                  >
-                                    + {sel.selectedOptions.map((o) => o.choice).join(", ")}
-                                  </span>
+                                  <div className="text-xs text-ink-soft">
+                                    {sel.selectedOptions.map((o, i) => (
+                                      <span key={i} className="block">+ {o.choice}</span>
+                                    ))}
+                                  </div>
                                 )}
                                 {sel.note && (
-                                  <span
-                                    className="text-xs text-ink-soft block truncate italic"
-                                    title={sel.note}
-                                  >
+                                  <span className="text-xs text-ink-soft block break-words italic">
                                     Note: {sel.note}
                                   </span>
                                 )}
@@ -949,7 +945,7 @@ export default function FoodOrderJoin({
                                     type="button"
                                     onClick={() => canEditPrice && startEditPrice(sel.id, override)}
                                     disabled={!canEditPrice}
-                                    className={`${sel.ordered ? "text-ink-soft line-through" : override == null && !sel.menuItem ? "text-red-400" : "text-ink-soft"} ${canEditPrice ? "hover:underline cursor-pointer" : "cursor-default"}`}
+                                    className={`${override == null && !sel.menuItem && !sel.ordered ? "text-red-400" : "text-ink-soft"} ${canEditPrice ? "hover:underline cursor-pointer" : "cursor-default"}`}
                                     title={canEditPrice ? "Click để nhập giá" : undefined}
                                   >
                                     {lineDisplay}
