@@ -49,7 +49,7 @@ interface Order {
   restaurantName: string;
   sourceUrl: string;
   orderType: string;
-  menuImageUrl: string | null;
+  menuImageUrls: string[];
   status: string;
   countdownEnd: string | null;
   paymentMode: string;
@@ -260,7 +260,7 @@ export default function FoodOrderJoin({
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(order.mySelections.length > 0);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
-  const [imgZoom, setImgZoom] = useState(false);
+  const [imgZoom, setImgZoom] = useState<number | null>(null);
 
   const [priceOverrideMap, setPriceOverrideMap] = useState<Record<string, number | null>>(() =>
     Object.fromEntries(order.allSelections.map((s) => [s.id, s.priceOverride ?? null]))
@@ -522,27 +522,32 @@ export default function FoodOrderJoin({
       )}
 
       {/* Manual: menu image */}
-      {isManual && order.menuImageUrl && (
+      {isManual && order.menuImageUrls.length > 0 && (
         <div>
           <h2 className="text-base font-semibold text-ink mb-2">Ảnh menu</h2>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={order.menuImageUrl}
-            alt="Menu"
-            onClick={() => setImgZoom(true)}
-            className="w-full max-h-[60vh] object-contain bg-bg border border-border rounded-xl cursor-zoom-in"
-          />
+          <div className="space-y-3">
+            {order.menuImageUrls.map((url, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={url}
+                alt={`Menu ${i + 1}`}
+                onClick={() => setImgZoom(i)}
+                className="w-full max-h-[60vh] object-contain bg-bg border border-border rounded-xl cursor-zoom-in"
+              />
+            ))}
+          </div>
           <p className="mt-1 text-xs text-ink-soft">Click ảnh để xem to. Gõ tên món vào bên dưới.</p>
         </div>
       )}
 
-      {isManual && imgZoom && order.menuImageUrl && (
+      {isManual && imgZoom !== null && order.menuImageUrls[imgZoom] && (
         <div
-          onClick={() => setImgZoom(false)}
+          onClick={() => setImgZoom(null)}
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={order.menuImageUrl} alt="Menu fullsize" className="max-w-full max-h-full object-contain" />
+          <img src={order.menuImageUrls[imgZoom]} alt="Menu fullsize" className="max-w-full max-h-full object-contain" />
         </div>
       )}
 

@@ -14,8 +14,8 @@ export default function NewFoodOrderForm() {
   const [orderType, setOrderType] = useState<OrderType>("link");
   const [restaurantName, setRestaurantName] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
-  const [menuFile, setMenuFile] = useState<File | null>(null);
-  const [menuPreview, setMenuPreview] = useState<string | null>(null);
+  const [menuFiles, setMenuFiles] = useState<File[]>([]);
+  const [menuPreviews, setMenuPreviews] = useState<string[]>([]);
   const [countdownMinutes, setCountdownMinutes] = useState("");
   const [paymentMode, setPaymentMode] = useState<"orderer_pays" | "split">("split");
   const [loading, setLoading] = useState(false);
@@ -34,11 +34,23 @@ export default function NewFoodOrderForm() {
     }
   }
 
-  function onPickFile(f: File | null) {
-    setMenuFile(f);
-    if (menuPreview) URL.revokeObjectURL(menuPreview);
-    setMenuPreview(f ? URL.createObjectURL(f) : null);
+  function onPickFiles(picked: FileList | null) {
+    if (!picked) return;
+    const added = Array.from(picked);
+    const combined = [...menuFiles, ...added].slice(0, 5);
+    const prevLen = menuFiles.length;
+    const newPreviews = combined.map((f, i) =>
+      i < prevLen ? menuPreviews[i] : URL.createObjectURL(f)
+    );
+    setMenuFiles(combined);
+    setMenuPreviews(newPreviews);
     setErrors((p) => { const n = { ...p }; delete n.menuFile; return n; });
+  }
+
+  function onRemoveFile(idx: number) {
+    URL.revokeObjectURL(menuPreviews[idx]);
+    setMenuFiles((prev) => prev.filter((_, i) => i !== idx));
+    setMenuPreviews((prev) => prev.filter((_, i) => i !== idx));
   }
 
   function validate() {
@@ -50,11 +62,20 @@ export default function NewFoodOrderForm() {
       else if (!isSupportedFoodUrl(trimmed))
         e.sourceUrl = "Hiện tại chỉ hỗ trợ link từ GrabFood (food.grab.com, r.grab.com) hoặc ShopeeFood (shopeefood.vn).";
     } else {
-      if (!menuFile) e.menuFile = "Vui lòng chọn ảnh menu";
-      else if (!["image/jpeg", "image/png", "image/webp"].includes(menuFile.type))
-        e.menuFile = "Chỉ hỗ trợ ảnh JPG, PNG, hoặc WEBP";
-      else if (menuFile.size > 5 * 1024 * 1024)
-        e.menuFile = "Ảnh tối đa 5MB";
+      if (menuFiles.length === 0) {
+        e.menuFile = "Vui lòng chọn ít nhất 1 ảnh menu";
+      } else {
+        for (const f of menuFiles) {
+          if (!["image/jpeg", "image/png", "image/webp"].includes(f.type)) {
+            e.menuFile = "Chỉ hỗ trợ ảnh JPG, PNG, hoặc WEBP";
+            break;
+          }
+          if (f.size > 5 * 1024 * 1024) {
+            e.menuFile = `${f.name}: ảnh tối đa 5MB`;
+            break;
+          }
+        }
+      }
     }
     if (countdownMinutes && parseInt(countdownMinutes) <= 0)
       e.countdownMinutes = "Countdown must be a positive number";
@@ -69,18 +90,20 @@ export default function NewFoodOrderForm() {
 
     setLoading(true);
     try {
-      let menuImageUrl: string | null = null;
+      const menuImageUrls: string[] = [];
 
-      if (orderType === "manual" && menuFile) {
-        const fd = new FormData();
-        fd.append("file", menuFile);
-        const upRes = await fetch("/api/food-orders/upload-menu-image", { method: "POST", body: fd });
-        const upData = await upRes.json();
-        if (!upRes.ok) {
-          toast("error", upData.error || "Upload thất bại");
-          return;
+      if (orderType === "manual") {
+        for (const file of menuFiles) {
+          const fd = new FormData();
+          fd.append("file", file);
+          const upRes = await fetch("/api/food-orders/upload-menu-image", { method: "POST", body: fd });
+          const upData = await upRes.json();
+          if (!upRes.ok) {
+            toast("error", upData.error || "Upload thất bại");
+            return;
+          }
+          menuImageUrls.push(upData.url);
         }
-        menuImageUrl = upData.url;
       }
 
       const res = await fetch("/api/food-orders", {
@@ -90,7 +113,7 @@ export default function NewFoodOrderForm() {
           orderType,
           restaurantName: restaurantName.trim(),
           sourceUrl: orderType === "link" ? sourceUrl.trim() : "",
-          menuImageUrl,
+          menuImageUrls,
           countdownMinutes: countdownMinutes ? parseInt(countdownMinutes) : 0,
           paymentMode,
           shippingFee: 0,
@@ -207,26 +230,41 @@ export default function NewFoodOrderForm() {
       {orderType === "manual" && (
         <div>
           <label className="block text-sm font-medium text-ink mb-1.5">
-            Ảnh menu <span className="text-red-500">*</span>
+            Ảnh menu <span className="text-red-500">*</span>{" "}
+            <span className="text-ink-soft font-normal">({menuFiles.length}/5)</span>
           </label>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-            className={`block w-full text-sm text-ink file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border file:border-border file:bg-bg file:text-ink hover:file:bg-surface ${
-              errors.menuFile ? "" : ""
-            }`}
-          />
-          {errors.menuFile && <p className="mt-1 text-xs text-red-500">{errors.menuFile}</p>}
-          {menuPreview && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={menuPreview}
-              alt="Menu preview"
-              className="mt-3 max-h-64 rounded-xl border border-border object-contain bg-bg"
+          {menuFiles.length < 5 && (
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              onChange={(e) => onPickFiles(e.target.files)}
+              className="block w-full text-sm text-ink file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border file:border-border file:bg-bg file:text-ink hover:file:bg-surface"
             />
           )}
-          <p className="mt-1 text-xs text-ink-soft">JPG/PNG/WEBP, tối đa 5MB. Member sẽ nhập tên món tay theo ảnh này.</p>
+          {errors.menuFile && <p className="mt-1 text-xs text-red-500">{errors.menuFile}</p>}
+          {menuPreviews.length > 0 && (
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {menuPreviews.map((preview, i) => (
+                <div key={i} className="relative group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={preview}
+                    alt={`Menu ${i + 1}`}
+                    className="w-full h-32 object-contain rounded-xl border border-border bg-bg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onRemoveFile(i)}
+                    className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="mt-1 text-xs text-ink-soft">JPG/PNG/WEBP, tối đa 5MB mỗi ảnh, tối đa 5 ảnh. Member sẽ nhập tên món tay theo ảnh này.</p>
         </div>
       )}
 

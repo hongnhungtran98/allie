@@ -37,7 +37,7 @@ interface Order {
   restaurantName: string;
   sourceUrl: string;
   orderType: string;
-  menuImageUrl: string | null;
+  menuImageUrls: string[];
   status: string;
   countdownEnd: string | null;
   paymentMode: string;
@@ -591,22 +591,27 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Left column: Menu + Selections */}
         <div className="space-y-6">
-        {isManual && order.menuImageUrl ? (
+        {isManual && order.menuImageUrls.length > 0 ? (
           <div>
             <h2 className="text-base font-semibold text-ink mb-3">Ảnh menu</h2>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <a
-              href={order.menuImageUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block"
-            >
-              <img
-                src={order.menuImageUrl}
-                alt="Menu"
-                className="w-full max-h-[50vh] object-contain bg-bg border border-border rounded-xl cursor-zoom-in"
-              />
-            </a>
+            <div className="space-y-3">
+              {order.menuImageUrls.map((url, i) => (
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`Menu ${i + 1}`}
+                    className="w-full max-h-[50vh] object-contain bg-bg border border-border rounded-xl cursor-zoom-in"
+                  />
+                </a>
+              ))}
+            </div>
             <p className="mt-1 text-xs text-ink-soft">
               Member nhập món tay theo ảnh này. Bạn nhập giá từng món bên dưới.
             </p>

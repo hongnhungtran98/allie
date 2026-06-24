@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { sourceUrl, orderType, restaurantName, menuImageUrl, countdownMinutes, paymentMode, shippingFee, discount } = await req.json();
+  const { sourceUrl, orderType, restaurantName, menuImageUrls, countdownMinutes, paymentMode, shippingFee, discount } = await req.json();
 
   const type = orderType === "manual" ? "manual" : "link";
 
@@ -30,8 +30,13 @@ export async function POST(req: Request) {
     if (!sourceUrl?.trim())
       return NextResponse.json({ error: "Source URL is required" }, { status: 400 });
   } else {
-    if (!menuImageUrl || typeof menuImageUrl !== "string" || !menuImageUrl.startsWith("/api/food-orders/menu-image/"))
-      return NextResponse.json({ error: "Menu image is required" }, { status: 400 });
+    if (
+      !Array.isArray(menuImageUrls) ||
+      menuImageUrls.length === 0 ||
+      menuImageUrls.length > 5 ||
+      !menuImageUrls.every((u: unknown) => typeof u === "string" && u.startsWith("/api/food-orders/menu-image/"))
+    )
+      return NextResponse.json({ error: "Menu image is required (1–5 images)" }, { status: 400 });
   }
 
   if (!["orderer_pays", "split"].includes(paymentMode))
@@ -47,7 +52,7 @@ export async function POST(req: Request) {
       creatorId: session.user.id,
       sourceUrl: type === "link" ? sourceUrl.trim() : "",
       orderType: type,
-      menuImageUrl: type === "manual" ? menuImageUrl : null,
+      menuImageUrls: type === "manual" ? menuImageUrls : [],
       restaurantName: typeof restaurantName === "string" ? restaurantName.trim() : "",
       status: "open",
       countdownEnd,

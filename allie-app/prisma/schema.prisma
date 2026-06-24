@@ -133,7 +133,7 @@ model FoodOrder {
   creatorId      String
   sourceUrl      String
   orderType      String    @default("link")
-  menuImageUrl   String?
+  menuImageUrls  String[]
   restaurantName String    @default("")
   status         String    @default("open")
   countdownEnd   DateTime?
