@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import Link from "next/link";
@@ -16,6 +16,11 @@ export default function NewFoodOrderForm() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [menuFiles, setMenuFiles] = useState<File[]>([]);
   const [menuPreviews, setMenuPreviews] = useState<string[]>([]);
+  const menuFilesRef = useRef<File[]>([]);
+  const menuPreviewsRef = useRef<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { menuFilesRef.current = menuFiles; }, [menuFiles]);
+  useEffect(() => { menuPreviewsRef.current = menuPreviews; }, [menuPreviews]);
   const [countdownMinutes, setCountdownMinutes] = useState("");
   const [paymentMode, setPaymentMode] = useState<"orderer_pays" | "split">("split");
   const [loading, setLoading] = useState(false);
@@ -34,24 +39,48 @@ export default function NewFoodOrderForm() {
     }
   }
 
-  function onPickFiles(picked: FileList | null) {
-    if (!picked) return;
-    const added = Array.from(picked);
-    const combined = [...menuFiles, ...added].slice(0, 5);
-    const prevLen = menuFiles.length;
+  function addFiles(added: File[]) {
+    const current = menuFilesRef.current;
+    const currentPreviews = menuPreviewsRef.current;
+    const combined = [...current, ...added].slice(0, 5);
+    const prevLen = current.length;
     const newPreviews = combined.map((f, i) =>
-      i < prevLen ? menuPreviews[i] : URL.createObjectURL(f)
+      i < prevLen ? currentPreviews[i] : URL.createObjectURL(f)
     );
     setMenuFiles(combined);
     setMenuPreviews(newPreviews);
     setErrors((p) => { const n = { ...p }; delete n.menuFile; return n; });
   }
 
+  function onPickFiles(picked: FileList | null) {
+    if (!picked) return;
+    addFiles(Array.from(picked));
+  }
+
   function onRemoveFile(idx: number) {
-    URL.revokeObjectURL(menuPreviews[idx]);
+    URL.revokeObjectURL(menuPreviewsRef.current[idx]);
     setMenuFiles((prev) => prev.filter((_, i) => i !== idx));
     setMenuPreviews((prev) => prev.filter((_, i) => i !== idx));
   }
+
+  useEffect(() => {
+    if (orderType !== "manual") return;
+    function handlePaste(e: ClipboardEvent) {
+      if (menuFilesRef.current.length >= 5) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const imageFiles: File[] = [];
+      for (const item of Array.from(items)) {
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          const f = item.getAsFile();
+          if (f) imageFiles.push(f);
+        }
+      }
+      if (imageFiles.length > 0) addFiles(imageFiles);
+    }
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [orderType]);
 
   function validate() {
     const e: Record<string, string> = {};
@@ -234,13 +263,30 @@ export default function NewFoodOrderForm() {
             <span className="text-ink-soft font-normal">({menuFiles.length}/5)</span>
           </label>
           {menuFiles.length < 5 && (
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              onChange={(e) => onPickFiles(e.target.files)}
-              className="block w-full text-sm text-ink file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border file:border-border file:bg-bg file:text-ink hover:file:bg-surface"
-            />
+            <div className="space-y-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                onChange={(e) => { onPickFiles(e.target.files); e.target.value = ""; }}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3 py-2 text-sm border border-border rounded-xl bg-bg text-ink hover:bg-surface transition-colors"
+              >
+                Chọn ảnh
+              </button>
+              <div className="flex items-center justify-center border border-dashed border-border rounded-xl py-3 text-xs text-ink-soft select-none">
+                Hoặc nhấn{" "}
+                <kbd className="mx-1 px-1.5 py-0.5 rounded border border-border bg-bg font-mono text-ink">
+                  Ctrl+V
+                </kbd>{" "}
+                để paste ảnh từ clipboard
+              </div>
+            </div>
           )}
           {errors.menuFile && <p className="mt-1 text-xs text-red-500">{errors.menuFile}</p>}
           {menuPreviews.length > 0 && (

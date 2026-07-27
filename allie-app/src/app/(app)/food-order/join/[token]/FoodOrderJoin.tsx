@@ -7,7 +7,13 @@ import FoodOrderStatusBadge from "../../FoodOrderStatusBadge";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 interface OptionChoice { label: string; price: number }
-interface OptionGroup { group: string; choices: OptionChoice[] }
+interface OptionGroup {
+  group: string;
+  choices: OptionChoice[];
+  selectionType?: number;
+  selectionRangeMax?: number;
+  selectionRangeMin?: number;
+}
 interface MenuItem {
   id: string;
   name: string;
@@ -120,37 +126,69 @@ function OptionSelector({
   selected: { group: string; choice: string; price: number }[];
   onChange: (sel: { group: string; choice: string; price: number }[]) => void;
 }) {
-  function pick(group: string, choice: string, price: number) {
-    const without = selected.filter((s) => s.group !== group);
-    onChange([...without, { group, choice, price }]);
+  function pick(og: OptionGroup, choice: string, price: number) {
+    const isMulti = og.selectionType === 1;
+    if (isMulti) {
+      const alreadySelected = selected.some((s) => s.group === og.group && s.choice === choice);
+      if (alreadySelected) {
+        onChange(selected.filter((s) => !(s.group === og.group && s.choice === choice)));
+      } else {
+        const groupCount = selected.filter((s) => s.group === og.group).length;
+        if (og.selectionRangeMax && groupCount >= og.selectionRangeMax) return;
+        onChange([...selected, { group: og.group, choice, price }]);
+      }
+    } else {
+      const without = selected.filter((s) => s.group !== og.group);
+      onChange([...without, { group: og.group, choice, price }]);
+    }
   }
 
   return (
     <div className="space-y-2 mt-2">
-      {options.map((og) => (
-        <div key={og.group}>
-          <p className="text-xs font-medium text-ink-soft mb-1">{og.group}</p>
-          <div className="flex flex-wrap gap-1.5">
-            {og.choices.map((c) => {
-              const active = selected.some((s) => s.group === og.group && s.choice === c.label);
-              return (
-                <button
-                  key={c.label}
-                  type="button"
-                  onClick={() => pick(og.group, c.label, c.price)}
-                  className={`px-2 py-1 text-xs rounded-lg border transition-colors ${
-                    active
-                      ? "border-lavender-500 bg-lavender-50 text-lavender-700"
-                      : "border-border text-ink hover:bg-bg"
-                  }`}
-                >
-                  {c.label}{c.price > 0 && <span className="ml-1 text-ink-soft">+{c.price.toLocaleString("vi-VN")}₫</span>}
-                </button>
-              );
-            })}
+      {options.map((og) => {
+        const isMulti = og.selectionType === 1;
+        const groupCount = selected.filter((s) => s.group === og.group).length;
+        const atMax = isMulti && og.selectionRangeMax != null && groupCount >= og.selectionRangeMax;
+        return (
+          <div key={og.group}>
+            <div className="flex items-baseline gap-1.5 mb-1">
+              <p className="text-xs font-medium text-ink-soft">{og.group}</p>
+              {isMulti && (
+                <span className="text-[10px] text-ink-soft">
+                  {og.selectionRangeMin != null && og.selectionRangeMin > 0
+                    ? `chọn ${og.selectionRangeMin}${og.selectionRangeMax != null && og.selectionRangeMax !== og.selectionRangeMin ? `–${og.selectionRangeMax}` : ""}`
+                    : og.selectionRangeMax != null
+                    ? `tối đa ${og.selectionRangeMax}`
+                    : ""}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {og.choices.map((c) => {
+                const active = selected.some((s) => s.group === og.group && s.choice === c.label);
+                const disabled = !active && atMax;
+                return (
+                  <button
+                    key={c.label}
+                    type="button"
+                    onClick={() => pick(og, c.label, c.price)}
+                    disabled={disabled}
+                    className={`px-2 py-1 text-xs rounded-lg border transition-colors ${
+                      active
+                        ? "border-lavender-500 bg-lavender-50 text-lavender-700"
+                        : disabled
+                        ? "border-border text-ink-soft opacity-40 cursor-not-allowed"
+                        : "border-border text-ink hover:bg-bg"
+                    }`}
+                  >
+                    {c.label}{c.price > 0 && <span className="ml-1 text-ink-soft">+{c.price.toLocaleString("vi-VN")}₫</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -971,6 +1009,46 @@ export default function FoodOrderJoin({
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Aggregated list for host to send to restaurant */}
+          {isManual && (() => {
+            const agg: Record<string, number> = {};
+            for (const sel of order.allSelections) {
+              const name = (sel.menuItem?.name ?? sel.customName ?? "").trim();
+              if (!name) continue;
+              agg[name] = (agg[name] ?? 0) + sel.quantity;
+            }
+            const rows = Object.entries(agg).sort((a, b) => b[1] - a[1]);
+            if (rows.length === 0) return null;
+            const summaryText = rows.map(([name, qty]) => `${name} x${qty}`).join("\n");
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-base font-semibold text-ink">Tổng hợp món cần đặt</h2>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(summaryText);
+                      toast("success", "Đã copy danh sách món");
+                    }}
+                    className="text-xs text-lavender-600 hover:underline"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <div className="bg-surface border border-border rounded-xl p-3">
+                  <div className="space-y-1">
+                    {rows.map(([name, qty]) => (
+                      <div key={name} className="flex justify-between text-sm gap-2">
+                        <span className="text-ink break-words flex-1 min-w-0">{name}</span>
+                        <span className="text-ink-soft shrink-0">×{qty}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             );

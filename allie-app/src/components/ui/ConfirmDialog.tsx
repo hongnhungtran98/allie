@@ -40,7 +40,7 @@ export default function ConfirmDialog({
             disabled={loading}
             className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 disabled:opacity-60 rounded-xl transition-colors cursor-pointer"
           >
-            {loading ? "Deleting..." : confirmLabel}
+            {confirmLabel}
           </button>
         </div>
       </div>

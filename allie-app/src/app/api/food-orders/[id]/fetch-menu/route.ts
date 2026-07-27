@@ -11,12 +11,20 @@ import { connect as connectRealBrowser } from "puppeteer-real-browser";
 
 type Params = { params: Promise<{ id: string }> };
 
+interface RawOption {
+  group: string;
+  choices: { label: string; price: number }[];
+  selectionType?: number;
+  selectionRangeMax?: number;
+  selectionRangeMin?: number;
+}
+
 interface RawItem {
   name: string;
   imageUrl: string | null;
   originalPrice: number;
   discountedPrice: number | null;
-  options: { group: string; choices: { label: string; price: number }[] }[];
+  options: RawOption[];
   category: string | null;
   categorySortOrder: number;
   itemSortOrder: number;
@@ -29,11 +37,9 @@ function parseVnPrice(text: string): number {
 
 // Parse modifier groups from a raw GrabFood API item.
 // GrabFood uses several field names across API versions; we try each in order.
-function parseGrabModifierGroups(
-  raw: unknown
-): { group: string; choices: { label: string; price: number }[] }[] {
+function parseGrabModifierGroups(raw: unknown): RawOption[] {
   if (!Array.isArray(raw)) return [];
-  const result: { group: string; choices: { label: string; price: number }[] }[] = [];
+  const result: RawOption[] = [];
   for (const g of raw) {
     const group = g as Record<string, unknown>;
     // GrabFood marks disabled groups/choices by omitting `available` (or setting it false).
@@ -55,7 +61,13 @@ function parseGrabModifierGroups(
         return { label, price };
       })
       .filter((c): c is { label: string; price: number } => c !== null && c.label !== "");
-    if (choices.length > 0) result.push({ group: groupName, choices });
+    if (choices.length > 0) {
+      const entry: RawOption = { group: groupName, choices };
+      if (typeof group.selectionType === "number") entry.selectionType = group.selectionType;
+      if (typeof group.selectionRangeMax === "number") entry.selectionRangeMax = group.selectionRangeMax;
+      if (typeof group.selectionRangeMin === "number") entry.selectionRangeMin = group.selectionRangeMin;
+      result.push(entry);
+    }
   }
   return result;
 }
@@ -111,13 +123,13 @@ function parseGrabApiJson(
       const name = String(item.name ?? "").trim();
       if (!name) return;
 
-      // GrabFood uses priceInMinorUnit (VND, already in full units for VN)
-      const originalPrice = Number(item.priceInMinorUnit ?? item.price ?? 0);
+      // GrabFood uses priceInMinorUnit for dine-in, takeawayPriceInMin for delivery
+      const originalPrice = Number(item.takeawayPriceInMin ?? item.priceInMinorUnit ?? item.price ?? 0);
       if (!originalPrice) return;
 
       const imageUrl = (item.imgHref as string | undefined) ?? null;
 
-      const discountedRaw = Number(item.discountedPriceInMinorUnit ?? item.discountedPrice ?? 0);
+      const discountedRaw = Number(item.discountedPriceInMinorUnit ?? item.discountedPriceInMin ?? item.discountedPrice ?? 0);
       const discountedPrice =
         discountedRaw > 0 && discountedRaw !== originalPrice ? discountedRaw : null;
 
