@@ -1013,46 +1013,6 @@ export default function FoodOrderJoin({
               </div>
             );
           })()}
-
-          {/* Aggregated list for host to send to restaurant */}
-          {isManual && (() => {
-            const agg: Record<string, number> = {};
-            for (const sel of order.allSelections) {
-              const name = (sel.menuItem?.name ?? sel.customName ?? "").trim();
-              if (!name) continue;
-              agg[name] = (agg[name] ?? 0) + sel.quantity;
-            }
-            const rows = Object.entries(agg).sort((a, b) => b[1] - a[1]);
-            if (rows.length === 0) return null;
-            const summaryText = rows.map(([name, qty]) => `${name} x${qty}`).join("\n");
-            return (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-base font-semibold text-ink">Tổng hợp món cần đặt</h2>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(summaryText);
-                      toast("success", "Đã copy danh sách món");
-                    }}
-                    className="text-xs text-lavender-600 hover:underline"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <div className="bg-surface border border-border rounded-xl p-3">
-                  <div className="space-y-1">
-                    {rows.map(([name, qty]) => (
-                      <div key={name} className="flex justify-between text-sm gap-2">
-                        <span className="text-ink break-words flex-1 min-w-0">{name}</span>
-                        <span className="text-ink-soft shrink-0">×{qty}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
         </div>
       </div>
 

@@ -406,6 +406,24 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
     });
   }
 
+  const [copiedSelections, setCopiedSelections] = useState(false);
+
+  function copySelections() {
+    const agg: Record<string, number> = {};
+    for (const sel of order.selections) {
+      const name = selectionName(sel);
+      agg[name] = (agg[name] ?? 0) + sel.quantity;
+    }
+    const text = Object.entries(agg)
+      .map(([name, qty]) => `${name} x${qty}`)
+      .join("\n");
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedSelections(true);
+      toast("success", "Đã copy danh sách món");
+      setTimeout(() => setCopiedSelections(false), 2000);
+    });
+  }
+
   // Group selections by user
   const byUser: Record<string, { userName: string; items: SelectionItem[] }> = {};
   for (const sel of order.selections) {
@@ -711,9 +729,19 @@ export default function FoodOrderDetail({ order, currentUserId }: { order: Order
 
         {/* Selections */}
         <div>
-          <h2 className="text-base font-semibold text-ink mb-3">
-            Selections ({Object.keys(byUser).length} people)
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-ink">
+              Selections ({Object.keys(byUser).length} people)
+            </h2>
+            {order.selections.length > 0 && (
+              <button
+                onClick={copySelections}
+                className="px-3 py-1.5 text-xs font-medium text-lavender-600 border border-lavender-200 hover:bg-lavender-50 rounded-xl transition-colors"
+              >
+                {copiedSelections ? "Copied!" : "Copy bill selection"}
+              </button>
+            )}
+          </div>
           {Object.keys(byUser).length === 0 ? (
             <div className="bg-surface border border-border rounded-2xl p-8 text-center text-ink-soft text-sm">
               No selections yet
